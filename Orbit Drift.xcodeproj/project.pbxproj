@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2DB16ADC2D2E15CF00B8AB6C /* Orbit Drift Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 2DB16ADB2D2E15CF00B8AB6C /* Orbit Drift Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2DB16AF42D2E166500B8AB6C /* SpriteKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2DB16AF32D2E166500B8AB6C /* SpriteKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,6 +38,7 @@
 /* Begin PBXFileReference section */
 		2DB16AD52D2E15CF00B8AB6C /* Orbit Drift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Orbit Drift.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DB16ADB2D2E15CF00B8AB6C /* Orbit Drift Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Orbit Drift Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		2DB16AF32D2E166500B8AB6C /* SpriteKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SpriteKit.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS11.2.sdk/System/Library/Frameworks/SpriteKit.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +54,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DB16AF42D2E166500B8AB6C /* SpriteKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				2DB16ADF2D2E15CF00B8AB6C /* Orbit Drift Watch App */,
+				2DB16AF22D2E166500B8AB6C /* Frameworks */,
 				2DB16AD62D2E15CF00B8AB6C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +77,14 @@
 				2DB16ADB2D2E15CF00B8AB6C /* Orbit Drift Watch App.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		2DB16AF22D2E166500B8AB6C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2DB16AF32D2E166500B8AB6C /* SpriteKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
