@@ -1,37 +1,46 @@
 import SpriteKit
 import WatchKit
 
+/// Definiert die verschiedenen Physik-Kategorien für Kollisionserkennung
 struct PhysicsCategory {
-    static let none      : UInt32 = 0
-    static let player    : UInt32 = 0b1      // 1
-    static let asteroid  : UInt32 = 0b10     // 2
+    static let none      : UInt32 = 0         // Keine Kategorie
+    static let player    : UInt32 = 0b1       // Spielerschiff (Bit 1)
+    static let asteroid  : UInt32 = 0b10      // Asteroiden (Bit 2)
 }
 
+/// Die Hauptspielszene, die das gesamte Gameplay verwaltet
 class GameScene: SKScene, SKPhysicsContactDelegate {
-    // Player properties
-    private var playerShip: SKSpriteNode?
-    private var lastUpdateTime: TimeInterval = 0
-    private var lastCrownValue: Double = 0.5
-    private var currentPlayerY: CGFloat = 0
+    // MARK: - Properties
     
-    // Asteroid properties
-    private var lastAsteroidSpawn: TimeInterval = 0
-    private let asteroidSpawnInterval: TimeInterval = 2.0
-    private let asteroidSpeed: CGFloat = 100.0
+    /// Spieler-bezogene Eigenschaften
+    private var playerShip: SKSpriteNode?          // Das Raumschiff-Sprite
+    private var lastUpdateTime: TimeInterval = 0    // Zeitpunkt des letzten Updates
+    private var lastCrownValue: Double = 0.5       // Letzte Position der Digital Crown
+    private var currentPlayerY: CGFloat = 0        // Aktuelle vertikale Position des Schiffs
     
-    // UI Elements
-    private var scoreLabel: SKLabelNode?
+    /// Asteroiden-bezogene Eigenschaften
+    private var lastAsteroidSpawn: TimeInterval = 0         // Zeitpunkt des letzten Asteroiden-Spawns
+    private let asteroidSpawnInterval: TimeInterval = 2.0   // Zeitintervall zwischen Asteroiden
+    private let asteroidSpeed: CGFloat = 100.0             // Geschwindigkeit der Asteroiden
     
+    /// UI-Elemente
+    private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
+    
+    // MARK: - Scene Lifecycle
+    
+    /// Wird aufgerufen, wenn die Szene geladen wird
     override func sceneDidLoad() {
         super.sceneDidLoad()
         
-        // Physik-Delegate setzen
-        physicsWorld.contactDelegate = self
-        physicsWorld.gravity = .zero
+        // Physik-Engine Setup
+        physicsWorld.contactDelegate = self    // Ermöglicht Kollisionserkennung
+        physicsWorld.gravity = .zero           // Deaktiviert Schwerkraft
         
+        // Setze Weltraum-Hintergrund
         backgroundColor = .init(red: 0.04, green: 0.04, blue: 0.16, alpha: 1.0)
         print("Scene loaded with size: \(frame.size)")
         
+        // Initialisiere Spielkomponenten
         setupUI()
         setupPlayer()
         setupCrownControl()
@@ -39,8 +48,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         GameManager.shared.startGame()
     }
     
+    // MARK: - Setup Methods
+    
+    /// Richtet die UI-Elemente ein
     private func setupUI() {
-        // Score Label
+        // Erstelle und positioniere das Score-Label
         scoreLabel = SKLabelNode(fontNamed: "Helvetica")
         if let label = scoreLabel {
             label.fontSize = 14
@@ -52,18 +64,19 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    /// Erstellt und konfiguriert das Spielerschiff
     private func setupPlayer() {
         playerShip = SKSpriteNode(color: .cyan, size: CGSize(width: 15, height: 15))
         if let ship = playerShip {
-            // Starte exakt in der Mitte
+            // Positioniere das Schiff
             currentPlayerY = frame.height / 2
             ship.position = CGPoint(x: frame.width * 0.2, y: currentPlayerY)
             
-            // Physik-Body für das Schiff
+            // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(rectangleOf: ship.size)
             ship.physicsBody?.categoryBitMask = PhysicsCategory.player
             ship.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid
-            ship.physicsBody?.collisionBitMask = 0  // Keine physikalische Kollision
+            ship.physicsBody?.collisionBitMask = 0  // Keine physische Kollision
             ship.physicsBody?.isDynamic = true
             
             addChild(ship)
@@ -71,6 +84,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    /// Richtet die Digital Crown Steuerung ein
     private func setupCrownControl() {
         NotificationCenter.default.addObserver(
             self,
@@ -80,17 +94,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         )
     }
     
+    // MARK: - Input Handling
+    
+    /// Verarbeitet die Rotationsbewegungen der Digital Crown
     @objc private func handleCrownRotation(_ notification: Notification) {
         guard let value = notification.userInfo?["value"] as? Double else { return }
         
         if let ship = playerShip {
-            // Direkte Positionsberechnung basierend auf dem Crown-Wert
+            // Berechne neue vertikale Position basierend auf Crown-Rotation
             let newY = value * frame.height
             currentPlayerY = newY
             ship.position.y = currentPlayerY
         }
     }
     
+    // MARK: - Update Loop
+    
+    /// Wird regelmäßig aufgerufen, um das Spiel zu aktualisieren
     override func update(_ currentTime: TimeInterval) {
         if lastUpdateTime == 0 {
             lastUpdateTime = currentTime
@@ -117,6 +137,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    // MARK: - Asteroiden Verwaltung
+    
+    /// Erstellt einen neuen Asteroiden
     private func spawnAsteroid() {
         let asteroid = Asteroid(size: CGSize(width: 20, height: 20))
         
@@ -133,6 +156,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(asteroid)
     }
     
+    /// Aktualisiert die Positionen der Asteroiden
     private func updateAsteroids(_ deltaTime: TimeInterval) {
         enumerateChildNodes(withName: "asteroid") { node, _ in
             // Bewege Asteroid nach links
@@ -148,11 +172,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    // MARK: - Score Verwaltung
+    
+    /// Aktualisiert die Anzeige des Punktestands
     private func updateScoreDisplay() {
         scoreLabel?.text = "\(GameManager.shared.score)"
     }
     
-    // Kollisionserkennung
+    // MARK: - Kollisionserkennung
+    
+    /// Wird aufgerufen, wenn eine Kollision erkannt wird
     func didBegin(_ contact: SKPhysicsContact) {
         let collision = contact.bodyA.categoryBitMask | contact.bodyB.categoryBitMask
         
@@ -162,6 +191,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    /// Verarbeitet die Kollision zwischen Spieler und Asteroid
     private func handleCollision() {
         if let ship = playerShip {
             // Vibration feedback
@@ -186,6 +216,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    // MARK: - Game Over
+    
+    /// Zeigt das Game Over-Menü an
     private func showGameOver() {
         let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
         gameOverLabel.text = "Game Over!"
