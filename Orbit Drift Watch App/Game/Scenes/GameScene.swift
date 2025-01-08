@@ -21,8 +21,29 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Asteroiden-bezogene Eigenschaften
     private var lastAsteroidSpawn: TimeInterval = 0         // Zeitpunkt des letzten Asteroiden-Spawns
-    private let asteroidSpawnInterval: TimeInterval = 2.0   // Zeitintervall zwischen Asteroiden
-    private let asteroidSpeed: CGFloat = 100.0             // Geschwindigkeit der Asteroiden
+    private let baseAsteroidInterval: TimeInterval = 2.0    // Basis-Zeitintervall zwischen Asteroiden
+    private let asteroidSpeed: CGFloat = 150.0             // Geschwindigkeit der Asteroiden
+    private let playerXPosition: CGFloat = 0.15            // Horizontale Position des Spielers
+    
+    /// Berechnet das aktuelle Spawn-Intervall basierend auf dem Score
+    private var currentAsteroidInterval: TimeInterval {
+        let score = GameManager.shared.score
+        // Reduziere das Intervall mit steigendem Score
+        // Bei Score 1000 ist das Intervall bei etwa 0.5 Sekunden
+        let interval = baseAsteroidInterval * (1.0 / (1.0 + Double(score) / 1000.0))
+        return max(0.5, interval) // Minimum 0.5 Sekunden
+    }
+    
+    /// Berechnet die Anzahl der gleichzeitig zu spawnenden Asteroiden
+    private var currentAsteroidCount: Int {
+        let score = GameManager.shared.score
+        // Erhöhe die Anzahl mit steigendem Score
+        // Bei Score 0: 1 Asteroid
+        // Bei Score 500: 2 Asteroiden
+        // Bei Score 1500: 3 Asteroiden
+        // usw.
+        return 1 + Int(Double(score) / 500.0)
+    }
     
     /// UI-Elemente
     private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
@@ -71,7 +92,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if let ship = playerShip {
             // Positioniere das Schiff
             currentPlayerY = frame.height / 2
-            ship.position = CGPoint(x: frame.width * 0.2, y: currentPlayerY)
+            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
             
             // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(rectangleOf: ship.size)
@@ -99,13 +120,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Verarbeitet die Rotationsbewegungen der Digital Crown
     @objc private func handleCrownRotation(_ notification: Notification) {
+        // Keine Bewegung während Game Over
+        guard GameManager.shared.isGameRunning else { return }
+        
         guard let value = notification.userInfo?["value"] as? Double else { return }
         
         if let ship = playerShip {
             // Berechne neue vertikale Position basierend auf Crown-Rotation
             let newY = value * frame.height
             currentPlayerY = newY
-            ship.position.y = currentPlayerY
+            // Nur Y-Position aktualisieren, X-Position beibehalten
+            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
         }
     }
     
@@ -126,8 +151,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         lastUpdateTime = currentTime
         
         // Spawn new asteroids
-        if currentTime - lastAsteroidSpawn > asteroidSpawnInterval {
-            spawnAsteroid()
+        if currentTime - lastAsteroidSpawn > currentAsteroidInterval {
+            for _ in 1...currentAsteroidCount {
+                spawnAsteroid()
+            }
             lastAsteroidSpawn = currentTime
         }
         
@@ -147,7 +174,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Zufällige Y-Position
         let randomY = CGFloat.random(in: 0...frame.height)
-        asteroid.position = CGPoint(x: frame.width + asteroid.size.width, y: randomY)
+        asteroid.position = CGPoint(x: frame.width * 1.5, y: randomY)  // Spawne weiter rechts außerhalb des Bildschirms
         
         // Zufällige Rotation
         asteroid.zRotation = CGFloat.random(in: 0...(2 * .pi))
@@ -160,6 +187,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Aktualisiert die Positionen der Asteroiden
     private func updateAsteroids(_ deltaTime: TimeInterval) {
+        // Keine Bewegung während Game Over
+        guard GameManager.shared.isGameRunning else { return }
+        
         enumerateChildNodes(withName: "asteroid") { node, _ in
             // Bewege Asteroid nach links
             node.position.x -= self.asteroidSpeed * CGFloat(deltaTime)
@@ -202,7 +232,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             // Visuelles Feedback basierend auf verbleibenden Leben
             // Prüfe zuerst auf Game Over
             if GameManager.shared.handleCollision() {
-                ship.color = .gray   // Game Over
+                ship.color = .red     // Game Over - Schiff wird rot
                 showGameOver()
                 return
             }
@@ -210,13 +240,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             // Wenn nicht Game Over, setze Farbe basierend auf verbleibenden Leben
             switch GameManager.shared.lives {
             case 3:
-                ship.color = .cyan   // Volle Leben
+                ship.color = .cyan    // Volle Leben - Cyan
             case 2:
-                ship.color = .yellow // Erste Warnung
+                ship.color = .yellow  // Erste Warnung - Gelb
             case 1:
-                ship.color = .red    // Kritischer Zustand
+                ship.color = .orange  // Zweite Warnung - Orange
             default:
-                ship.color = .gray   // Sollte nicht vorkommen
+                ship.color = .red     // Game Over - Rot
             }
             
             // Blink-Animation
@@ -253,11 +283,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 20)
         tapLabel.name = "tapLabel"
         addChild(tapLabel)
-        
-        // Entferne alle Asteroiden
-        enumerateChildNodes(withName: "asteroid") { node, _ in
-            node.removeFromParent()
-        }
     }
     
     /// Startet ein neues Spiel
@@ -272,6 +297,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Setze Spielerschiff zurück
         playerShip?.position.y = frame.height / 2
+        playerShip?.position.x = frame.width * playerXPosition
         playerShip?.color = .cyan
         
         // Starte neues Spiel
