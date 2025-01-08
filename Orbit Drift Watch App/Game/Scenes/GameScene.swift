@@ -103,8 +103,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if let label = scoreLabel {
             label.fontSize = 14
             label.horizontalAlignmentMode = .right
-            label.verticalAlignmentMode = .top
-            label.position = CGPoint(x: frame.width - 10, y: frame.height - 10)
+            label.verticalAlignmentMode = .bottom
+            label.position = CGPoint(x: frame.width - 10, y: 10)
             label.text = "0"
             addChild(label)
         }
@@ -221,8 +221,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Update heart positions
         updateHearts(deltaTime)
         
-        // Update score
+        // Passiver Score-Anstieg (1 Punkt pro Frame)
         GameManager.shared.addScore(1)
+        
+        // Update score
         updateScoreDisplay()
     }
     
@@ -419,21 +421,20 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Verarbeitet die Kollision zwischen Schuss und Asteroid
     private func handleBulletAsteroidCollision(_ contact: SKPhysicsContact) {
         // Identifiziere Schuss und Asteroid
-        let firstBody = contact.bodyA.categoryBitMask == PhysicsCategory.bullet ? contact.bodyA.node : contact.bodyB.node
-        let secondBody = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
+        let bullet = contact.bodyA.categoryBitMask == PhysicsCategory.bullet ? contact.bodyA.node : contact.bodyB.node
+        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne beide Objekte
-        firstBody?.removeFromParent()
-        secondBody?.removeFromParent()
+        bullet?.removeFromParent()
+        asteroid?.removeFromParent()
         
-        // Erhöhe den Score
-        GameManager.shared.addScore()
-        updateScoreDisplay()
-        
-        // Visuelles Feedback
-        if let position = secondBody?.position {
+        // Erstelle Explosionseffekt
+        if let position = asteroid?.position {
             createExplosion(at: position)
         }
+        
+        // Bonus-Punkte für zerstörten Asteroiden
+        GameManager.shared.addScore(50)
     }
     
     /// Verarbeitet die Kollision zwischen Spieler und Herz
@@ -446,6 +447,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Füge ein Leben hinzu
         GameManager.shared.addLife()
+        
+        // Bonus-Punkte für gesammeltes Herz
+        GameManager.shared.addScore(100)
         
         // Visuelles und haptisches Feedback
         if let ship = playerShip {
@@ -544,8 +548,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     // MARK: - Game Over
     
-    /// Zeigt das Game Over-Menü an
+    /// Zeigt den Game Over Screen an
     private func showGameOver() {
+        // Score Label ausblenden
+        scoreLabel?.isHidden = true
+        
         // Game Over Label
         let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
         gameOverLabel.text = "Game Over!"
@@ -561,25 +568,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 10)
         finalScoreLabel.name = "gameOverLabel"
         addChild(finalScoreLabel)
-        
-        // Highscore Label
-        let highscoreLabel = SKLabelNode(fontNamed: "Helvetica")
-        highscoreLabel.text = "Best: \(GameManager.shared.highscore)"
-        highscoreLabel.fontSize = 16
-        highscoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 10)
-        highscoreLabel.name = "gameOverLabel"
-        addChild(highscoreLabel)
-        
-        // New Highscore Indicator
-        if GameManager.shared.score >= GameManager.shared.highscore {
-            let newHighscoreLabel = SKLabelNode(fontNamed: "Helvetica")
-            newHighscoreLabel.text = "New Best!"
-            newHighscoreLabel.fontSize = 14
-            newHighscoreLabel.fontColor = .yellow
-            newHighscoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 30)
-            newHighscoreLabel.name = "gameOverLabel"
-            addChild(newHighscoreLabel)
-        }
         
         // Tap to Restart Label
         let tapLabel = SKLabelNode(fontNamed: "Helvetica")
@@ -628,5 +616,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             object: nil,
             userInfo: ["value": 0.5]  // Zurück zur Mitte
         )
+        
+        // Score Label wieder einblenden
+        scoreLabel?.isHidden = false
     }
 }
