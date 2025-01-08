@@ -51,6 +51,9 @@ struct ContentView: View {
                 // Wenn das Spiel vorbei ist, Neustart ermöglichen
                 if !GameManager.shared.isGameRunning {
                     (sceneController.scene as? GameScene)?.restartGame()
+                } else {
+                    // Wenn das Spiel läuft, schießen
+                    (sceneController.scene as? GameScene)?.shoot()
                 }
             }
     }
