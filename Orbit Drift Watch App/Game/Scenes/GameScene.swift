@@ -22,18 +22,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Spieler-bezogene Eigenschaften
     private var playerShip: SKShapeNode?          // Das Raumschiff-Sprite
-    private var lastUpdateTime: TimeInterval = 0    // Zeitpunkt des letzten Updates
-    private var lastCrownValue: Double = 0.5       // Letzte Position der Digital Crown
-    private var currentPlayerY: CGFloat = 0        // Aktuelle vertikale Position des Schiffs
-    private var targetPlayerY: CGFloat = 0         // Zielposition für sanfte Bewegung
-    private let playerMovementSpeed: CGFloat = 200.0 // Geschwindigkeit der Schiffbewegung
-    private let movementSmoothingFactor: CGFloat = 0.15 // Faktor für sanftere Bewegung
+    private var lastUpdateTime: TimeInterval = 0   // Zeitpunkt des letzten Updates
+    private var currentPlayerY: CGFloat = 0       // Aktuelle vertikale Position des Schiffs
+    private var lastCrownValue: Double = 0.5      // Letzte Position der Digital Crown
+    private let playerXPosition: CGFloat = 0.15   // Horizontale Position des Spielers
     
     /// Asteroiden-bezogene Eigenschaften
     private var lastAsteroidSpawn: TimeInterval = 0         // Zeitpunkt des letzten Asteroiden-Spawns
     private let baseAsteroidInterval: TimeInterval = 2.0    // Basis-Zeitintervall zwischen Asteroiden
     private let asteroidSpeed: CGFloat = 150.0             // Geschwindigkeit der Asteroiden
-    private let playerXPosition: CGFloat = 0.15            // Horizontale Position des Spielers
     
     /// Herz Power-Up Eigenschaften
     private var lastHeartSpawn: TimeInterval = 0           // Zeitpunkt des letzten Herz-Spawns
@@ -95,6 +92,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         setupUI()
         setupPlayer()
         setupCrownControl()
+        
+        // Starte das Spiel automatisch
+        GameManager.shared.startGame()
     }
     
     // MARK: - Setup Methods
@@ -148,38 +148,39 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
-    /// Richtet die Digital Crown Steuerung ein
+    /// Richtet die Crown-Steuerung ein
     private func setupCrownControl() {
+        // Registriere für Crown-Rotations-Benachrichtigungen
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleCrownRotation(_:)),
+            name: Notification.Name("CrownDidRotate"),
+            object: nil
+        )
+        
         // Setze initiale Position
         currentPlayerY = frame.height * 0.5
-        targetPlayerY = currentPlayerY
         lastCrownValue = 0.5
         
         if let ship = playerShip {
             ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
         }
-        
-        // Füge Observer hinzu
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleCrownRotation),
-            name: Notification.Name("CrownDidRotate"),
-            object: nil
-        )
     }
     
     // MARK: - Input Handling
     
-    /// Verarbeitet die Rotationsbewegungen der Digital Crown
+    /// Verarbeitet Crown-Rotationen
     @objc private func handleCrownRotation(_ notification: Notification) {
-        // Keine Bewegung während Game Over
-        guard GameManager.shared.isGameRunning else { return }
+        guard let value = notification.userInfo?["value"] as? Double,
+              let ship = playerShip else { return }
         
-        guard let value = notification.userInfo?["value"] as? Double else { return }
-        lastCrownValue = value  // Speichere den letzten Wert
+        // Berechne die Grenzen für die Crown-Position
+        let minY = ship.frame.height/2
+        let maxY = frame.height - ship.frame.height/2
         
-        // Setze neue Zielposition
-        targetPlayerY = CGFloat(value) * frame.height
+        // Normalisiere die Crown-Position auf die erlaubten Grenzen
+        let normalizedValue = max(minY/frame.height, min((maxY/frame.height), value))
+        lastCrownValue = normalizedValue
     }
     
     // MARK: - Update Loop
@@ -231,23 +232,15 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         updateScoreDisplay()
     }
     
-    /// Aktualisiert die Position des Spielerschiffs mit sanfter Bewegung
+    /// Aktualisiert die Position des Spielerschiffs
     private func updatePlayerPosition(_ deltaTime: TimeInterval) {
         guard let ship = playerShip else { return }
         
-        // Berechne die Distanz zur Zielposition
-        let distance = targetPlayerY - currentPlayerY
-        
-        // Wenn wir nah genug an der Zielposition sind, keine Bewegung
-        if abs(distance) < 0.5 {
-            return
-        }
-        
-        // Sanfte Bewegung mit Lerp (Linear Interpolation)
-        currentPlayerY += distance * movementSmoothingFactor
+        // Direkte Positionierung basierend auf Crown-Position
+        currentPlayerY = frame.height * CGFloat(lastCrownValue)
         
         // Stelle sicher, dass wir innerhalb der Bildschirmgrenzen bleiben
-        currentPlayerY = max(0, min(frame.height, currentPlayerY))
+        currentPlayerY = max(ship.frame.height/2, min(frame.height - ship.frame.height/2, currentPlayerY))
         
         // Aktualisiere die Schiffposition
         ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
@@ -366,7 +359,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         switch collision {
         case PhysicsCategory.player | PhysicsCategory.asteroid:
             // Kollision zwischen Spieler und Asteroid
-            handleCollision()
+            handlePlayerAsteroidCollision(contact)
             print("Kollision erkannt!")
             
         case PhysicsCategory.bullet | PhysicsCategory.asteroid:
@@ -383,41 +376,29 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     /// Verarbeitet die Kollision zwischen Spieler und Asteroid
-    private func handleCollision() {
-        guard let ship = playerShip else { return }
+    private func handlePlayerAsteroidCollision(_ contact: SKPhysicsContact) {
+        // Identifiziere den Asteroiden
+        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
         
-        // Vibration feedback
-        WKInterfaceDevice.current().play(.notification)
+        // Entferne den Asteroiden
+        asteroid?.removeFromParent()
         
+        // Reduziere Leben und prüfe auf Game Over
         if GameManager.shared.handleCollision() {
-            // Game Over
-            ship.fillColor = .red     // Game Over - Schiff wird rot
+            // Game Over Sound
+            WKInterfaceDevice.current().play(.failure)
             showGameOver()
-            return
-        }
-        
-        // Aktualisiere Schifffarbe basierend auf Leben
-        updateShipColor()
-        
-        // Blink-Animation
-        let fadeOut = SKAction.fadeAlpha(to: 0.5, duration: 0.2)
-        let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.2)
-        ship.run(SKAction.sequence([fadeOut, fadeIn]))
-    }
-    
-    /// Aktualisiert die Farbe des Schiffs basierend auf den verbleibenden Leben
-    private func updateShipColor() {
-        guard let ship = playerShip else { return }
-        
-        switch GameManager.shared.lives {
-        case 3:
-            ship.fillColor = .cyan    // Volle Leben - Cyan
-        case 2:
-            ship.fillColor = .yellow  // Erste Warnung - Gelb
-        case 1:
-            ship.fillColor = .orange  // Zweite Warnung - Orange
-        default:
-            ship.fillColor = .red     // Game Over - Rot
+        } else {
+            // Treffer-Sound wenn noch nicht Game Over
+            WKInterfaceDevice.current().play(.directionDown)
+            // Visuelles Feedback
+            if let ship = playerShip {
+                let fadeOut = SKAction.fadeAlpha(to: 0.5, duration: 0.2)
+                let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.2)
+                ship.run(SKAction.sequence([fadeOut, fadeIn]))
+            }
+            // Aktualisiere Schifffarbe
+            updateShipColor()
         }
     }
     
@@ -440,6 +421,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         GameManager.shared.addScore(50)
         GameManager.shared.addDestroyedAsteroid()
         showBonusPoints(50)
+        
+        // Sound für zerstörten Asteroiden
+        WKInterfaceDevice.current().play(.directionUp)
     }
     
     /// Verarbeitet die Kollision zwischen Spieler und Herz
@@ -458,17 +442,32 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         GameManager.shared.addScore(100)
         showBonusPoints(100)
         
-        // Visuelles und haptisches Feedback
-        if let ship = playerShip {
-            // Herz-Partikeleffekt
-            createHeartCollectionEffect(at: ship.position)
-            
-            // Setze Schifffarbe basierend auf Leben
-            updateShipColor()
+        // Erstelle Sammel-Effekt
+        if let position = heart?.position {
+            createHeartCollectionEffect(at: position)
         }
         
-        // Haptisches Feedback
+        // Sound für gesammeltes Herz
         WKInterfaceDevice.current().play(.success)
+        
+        // Aktualisiere Schifffarbe
+        updateShipColor()
+    }
+    
+    /// Aktualisiert die Farbe des Schiffs basierend auf den verbleibenden Leben
+    private func updateShipColor() {
+        guard let ship = playerShip else { return }
+        
+        switch GameManager.shared.lives {
+        case 3:
+            ship.fillColor = .cyan    // Volle Leben - Cyan
+        case 2:
+            ship.fillColor = .yellow  // Erste Warnung - Gelb
+        case 1:
+            ship.fillColor = .orange  // Zweite Warnung - Orange
+        default:
+            ship.fillColor = .red     // Game Over - Rot
+        }
     }
     
     /// Erstellt einen Partikeleffekt für das Einsammeln eines Herzens
@@ -547,18 +546,22 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         bonusLabel.run(SKAction.sequence([fadeIn, wait, fadeOut, remove]))
     }
     
-    /// Schießt einen Schuss vom Spielerschiff ab
+    /// Schießt einen Schuss ab
     public func shoot() {
-        guard let ship = playerShip, GameManager.shared.isGameRunning else { return }
+        guard let ship = playerShip,
+              GameManager.shared.isGameRunning else { return }
         
-        // Erstelle den Schuss
+        // Schuss-Sound sofort abspielen
+        WKInterfaceDevice.current().play(.start)
+        
+        // Erstelle einen Schuss
         let bullet = SKShapeNode(circleOfRadius: 3)
         bullet.fillColor = .cyan
-        bullet.strokeColor = .cyan
-        bullet.position = CGPoint(x: ship.position.x + 10, y: ship.position.y)
+        bullet.strokeColor = .clear
+        bullet.position = ship.position
         bullet.name = "bullet"
         
-        // Füge Physik hinzu
+        // Füge Physik-Body hinzu
         bullet.physicsBody = SKPhysicsBody(circleOfRadius: 3)
         bullet.physicsBody?.categoryBitMask = PhysicsCategory.bullet
         bullet.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid
@@ -568,12 +571,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         addChild(bullet)
         
         // Bewege den Schuss nach rechts
-        let moveAction = SKAction.moveBy(x: frame.width, y: 0, duration: TimeInterval(frame.width / bulletSpeed))
+        let moveAction = SKAction.moveBy(x: frame.width, y: 0, duration: frame.width / bulletSpeed)
         let removeAction = SKAction.removeFromParent()
         bullet.run(SKAction.sequence([moveAction, removeAction]))
-        
-        // Visuelles und haptisches Feedback
-        WKInterfaceDevice.current().play(.click)
     }
     
     // MARK: - Game Over
@@ -585,6 +585,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Verhindere sofortiges Neustarten
         canRestartGame = false
+        
+        // Spiele Game Over Sound
+        WKInterfaceDevice.current().play(.failure)
         
         // Game Over Label
         let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
@@ -656,7 +659,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Setze Spielerschiff zurück
         currentPlayerY = frame.height * 0.5  // Zurück zur Mitte
-        targetPlayerY = currentPlayerY       // Setze auch Zielposition zurück
         playerShip?.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
         playerShip?.fillColor = .cyan
         
@@ -672,5 +674,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Score Label wieder einblenden
         scoreLabel?.isHidden = false
+        
+        // Aktualisiere Schifffarbe
+        updateShipColor()
     }
 }

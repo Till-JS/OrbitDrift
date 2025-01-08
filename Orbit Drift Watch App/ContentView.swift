@@ -26,7 +26,7 @@ struct ContentView: View {
             SpriteView(scene: sceneController.scene, preferredFramesPerSecond: 60)
                 .ignoresSafeArea()  // Nutzt den gesamten verfügbaren Bildschirm
                 .focusable()        // Ermöglicht Fokus für Digital Crown Eingaben
-                .focused($isFocused)  // Bindet den Fokus-State
+                .focused($isFocused, equals: true)  // Setzt den Fokus sofort
                 .onTapGesture {
                     guard let gameScene = sceneController.scene as? GameScene else { return }
                     
@@ -47,15 +47,12 @@ struct ContentView: View {
                     $crownRotation,     // Binding zur Rotationsvariable
                     from: 0,            // Minimaler Wert
                     through: 1,         // Maximaler Wert
-                    by: 0.002,         // Schrittweite für präzise Steuerung
-                    sensitivity: .low,  // Niedrigere Empfindlichkeit für bessere Kontrolle
-                    isContinuous: true,  // Erlaubt kontinuierliche Rotation
-                    isHapticFeedbackEnabled: false  // Deaktiviert Haptic Feedback
+                    by: 0.005,          // Größere Schrittweite für stabilere Steuerung
+                    sensitivity: .low,   // Niedrige Empfindlichkeit für stabilere Kontrolle
+                    isContinuous: false, // Verhindert kontinuierliche Rotation über die Grenzen
+                    isHapticFeedbackEnabled: true  // Aktiviert Haptic Feedback an den Grenzen
                 )
                 .onAppear {
-                    // Setze initialen Fokus
-                    isFocused = true
-                    
                     // Setze initiale Crown-Position
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         NotificationCenter.default.post(
