@@ -87,6 +87,12 @@ class GameManager {
         isGameRunning = false
     }
     
+    /// Fügt ein Leben hinzu, maximal bis zu 3 Leben
+    func addLife() {
+        guard isGameRunning, lives < 3 else { return }
+        lives += 1
+    }
+    
     // MARK: - Hilfsfunktionen
     
     /// Aktualisiert die Spielschwierigkeit basierend auf dem aktuellen Score

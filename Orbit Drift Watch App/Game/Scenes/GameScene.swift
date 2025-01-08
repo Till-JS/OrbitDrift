@@ -8,6 +8,7 @@ struct PhysicsCategory {
     static let player    : UInt32 = 0b1       // Spielerschiff (Bit 1)
     static let asteroid  : UInt32 = 0b10      // Asteroiden (Bit 2)
     static let bullet    : UInt32 = 0b100     // Schüsse (Bit 3)
+    static let heart     : UInt32 = 0b1000    // Herz Power-Up (Bit 4)
 }
 
 /// Die Hauptspielszene, die das gesamte Gameplay verwaltet
@@ -28,6 +29,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private let baseAsteroidInterval: TimeInterval = 2.0    // Basis-Zeitintervall zwischen Asteroiden
     private let asteroidSpeed: CGFloat = 150.0             // Geschwindigkeit der Asteroiden
     private let playerXPosition: CGFloat = 0.15            // Horizontale Position des Spielers
+    
+    /// Herz Power-Up Eigenschaften
+    private var lastHeartSpawn: TimeInterval = 0           // Zeitpunkt des letzten Herz-Spawns
+    private let baseHeartInterval: TimeInterval = 15.0     // Basis-Zeitintervall zwischen Herzen
+    private let heartSpeed: CGFloat = 100.0               // Geschwindigkeit der Herzen
     
     /// Schuss-bezogene Eigenschaften
     private let bulletSpeed: CGFloat = 300.0             // Geschwindigkeit der Schüsse
@@ -128,7 +134,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(polygonFrom: shipPath)
             ship.physicsBody?.categoryBitMask = PhysicsCategory.player
-            ship.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid
+            ship.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid | PhysicsCategory.heart
             ship.physicsBody?.collisionBitMask = 0  // Keine physische Kollision
             ship.physicsBody?.isDynamic = true
             
@@ -183,6 +189,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if lastUpdateTime == 0 {
             lastUpdateTime = currentTime
             lastAsteroidSpawn = currentTime
+            lastHeartSpawn = currentTime
             return
         }
         
@@ -200,8 +207,19 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             lastAsteroidSpawn = currentTime
         }
         
+        // Spawn new heart power-up
+        if currentTime - lastHeartSpawn > baseHeartInterval {
+            if GameManager.shared.lives < 3 {  // Nur spawnen wenn Leben fehlen
+                spawnHeart()
+            }
+            lastHeartSpawn = currentTime
+        }
+        
         // Update asteroid positions
         updateAsteroids(deltaTime)
+        
+        // Update heart positions
+        updateHearts(deltaTime)
         
         // Update score
         GameManager.shared.addScore(1)
@@ -268,6 +286,65 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    // MARK: - Herz Power-Up Verwaltung
+    
+    /// Erstellt ein neues Herz Power-Up
+    private func spawnHeart() {
+        // Erstelle ein Herz-Symbol
+        let heart = SKShapeNode(path: createHeartPath(size: 12))
+        heart.fillColor = .red
+        heart.strokeColor = .clear
+        heart.name = "heart"
+        
+        // Setze Position am rechten Bildschirmrand mit zufälliger Höhe
+        let randomY = CGFloat.random(in: 0...frame.height)
+        heart.position = CGPoint(x: frame.width + 10, y: randomY)
+        
+        // Füge Physik hinzu
+        heart.physicsBody = SKPhysicsBody(polygonFrom: heart.path!)
+        heart.physicsBody?.categoryBitMask = PhysicsCategory.heart
+        heart.physicsBody?.contactTestBitMask = PhysicsCategory.player
+        heart.physicsBody?.collisionBitMask = 0
+        heart.physicsBody?.affectedByGravity = false
+        
+        addChild(heart)
+    }
+    
+    /// Erstellt einen Herz-Pfad
+    private func createHeartPath(size: CGFloat) -> CGPath {
+        let path = CGMutablePath()
+        
+        // Herz-Form
+        path.move(to: CGPoint(x: size/2, y: size*0.25))
+        path.addCurve(to: CGPoint(x: size, y: 0),
+                     control1: CGPoint(x: size/2, y: 0),
+                     control2: CGPoint(x: size*0.75, y: 0))
+        path.addCurve(to: CGPoint(x: size/2, y: size),
+                     control1: CGPoint(x: size, y: size*0.5),
+                     control2: CGPoint(x: size/2, y: size*0.75))
+        path.addCurve(to: CGPoint(x: 0, y: 0),
+                     control1: CGPoint(x: size/2, y: size*0.75),
+                     control2: CGPoint(x: 0, y: size*0.5))
+        path.addCurve(to: CGPoint(x: size/2, y: size*0.25),
+                     control1: CGPoint(x: size*0.25, y: 0),
+                     control2: CGPoint(x: size/2, y: 0))
+        
+        return path
+    }
+    
+    /// Aktualisiert die Positionen der Herzen
+    private func updateHearts(_ deltaTime: TimeInterval) {
+        enumerateChildNodes(withName: "heart") { node, _ in
+            // Bewege nach links
+            node.position.x -= self.heartSpeed * CGFloat(deltaTime)
+            
+            // Entferne wenn außerhalb des Bildschirms
+            if node.position.x < -10 {
+                node.removeFromParent()
+            }
+        }
+    }
+    
     // MARK: - Score Verwaltung
     
     /// Aktualisiert die Anzeige des Punktestands
@@ -281,44 +358,61 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     func didBegin(_ contact: SKPhysicsContact) {
         let collision = contact.bodyA.categoryBitMask | contact.bodyB.categoryBitMask
         
-        if collision == PhysicsCategory.player | PhysicsCategory.asteroid {
-            print("Kollision erkannt!")
+        switch collision {
+        case PhysicsCategory.player | PhysicsCategory.asteroid:
+            // Kollision zwischen Spieler und Asteroid
             handleCollision()
-        } else if collision == PhysicsCategory.bullet | PhysicsCategory.asteroid {
+            print("Kollision erkannt!")
+            
+        case PhysicsCategory.bullet | PhysicsCategory.asteroid:
+            // Kollision zwischen Schuss und Asteroid
             handleBulletAsteroidCollision(contact)
+            
+        case PhysicsCategory.player | PhysicsCategory.heart:
+            // Kollision zwischen Spieler und Herz
+            handlePlayerHeartCollision(contact)
+            
+        default:
+            break
         }
     }
     
     /// Verarbeitet die Kollision zwischen Spieler und Asteroid
     private func handleCollision() {
-        if let ship = playerShip {
-            // Vibration feedback
-            WKInterfaceDevice.current().play(.notification)
-            
-            // Visuelles Feedback basierend auf verbleibenden Leben
-            // Prüfe zuerst auf Game Over
-            if GameManager.shared.handleCollision() {
-                ship.fillColor = .red     // Game Over - Schiff wird rot
-                showGameOver()
-                return
-            }
-            
-            // Wenn nicht Game Over, setze Farbe basierend auf verbleibenden Leben
-            switch GameManager.shared.lives {
-            case 3:
-                ship.fillColor = .cyan    // Volle Leben - Cyan
-            case 2:
-                ship.fillColor = .yellow  // Erste Warnung - Gelb
-            case 1:
-                ship.fillColor = .orange  // Zweite Warnung - Orange
-            default:
-                ship.fillColor = .red     // Game Over - Rot
-            }
-            
-            // Blink-Animation
-            let fadeOut = SKAction.fadeAlpha(to: 0.5, duration: 0.2)
-            let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.2)
-            ship.run(SKAction.sequence([fadeOut, fadeIn]))
+        guard let ship = playerShip else { return }
+        
+        // Vibration feedback
+        WKInterfaceDevice.current().play(.notification)
+        
+        if GameManager.shared.handleCollision() {
+            // Game Over
+            ship.fillColor = .red     // Game Over - Schiff wird rot
+            showGameOver()
+            return
+        }
+        
+        // Aktualisiere Schifffarbe basierend auf Leben
+        updateShipColor()
+        
+        // Blink-Animation
+        let fadeOut = SKAction.fadeAlpha(to: 0.5, duration: 0.2)
+        let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.2)
+        ship.run(SKAction.sequence([fadeOut, fadeIn]))
+    }
+    
+    /// Aktualisiert die Farbe des Schiffs basierend auf den verbleibenden Leben
+    private func updateShipColor() {
+        guard let ship = playerShip else { return }
+        
+        switch GameManager.shared.lives {
+        case 3:
+            ship.fillColor = .cyan    // Volle Leben - Cyan
+        case 2:
+            ship.fillColor = .yellow  // Erste Warnung - Gelb
+        case 1:
+            ship.fillColor = .orange  // Zweite Warnung - Orange
+        default:
+            ship.fillColor = .red     // Game Over - Rot
         }
     }
     
@@ -339,6 +433,55 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Visuelles Feedback
         if let position = secondBody?.position {
             createExplosion(at: position)
+        }
+    }
+    
+    /// Verarbeitet die Kollision zwischen Spieler und Herz
+    private func handlePlayerHeartCollision(_ contact: SKPhysicsContact) {
+        // Identifiziere das Herz
+        let heart = contact.bodyA.categoryBitMask == PhysicsCategory.heart ? contact.bodyA.node : contact.bodyB.node
+        
+        // Entferne das Herz
+        heart?.removeFromParent()
+        
+        // Füge ein Leben hinzu
+        GameManager.shared.addLife()
+        
+        // Visuelles und haptisches Feedback
+        if let ship = playerShip {
+            // Herz-Partikeleffekt
+            createHeartCollectionEffect(at: ship.position)
+            
+            // Setze Schifffarbe basierend auf Leben
+            updateShipColor()
+        }
+        
+        // Haptisches Feedback
+        WKInterfaceDevice.current().play(.success)
+    }
+    
+    /// Erstellt einen Partikeleffekt für das Einsammeln eines Herzens
+    private func createHeartCollectionEffect(at position: CGPoint) {
+        for _ in 0..<8 {
+            let particle = SKShapeNode(circleOfRadius: 2)
+            particle.fillColor = .red
+            particle.strokeColor = .clear
+            particle.position = position
+            addChild(particle)
+            
+            let angle = CGFloat.random(in: 0...(2 * .pi))
+            let distance = CGFloat.random(in: 10...20)
+            let duration = TimeInterval.random(in: 0.2...0.4)
+            
+            let move = SKAction.move(to: CGPoint(
+                x: position.x + cos(angle) * distance,
+                y: position.y + sin(angle) * distance
+            ), duration: duration)
+            let fade = SKAction.fadeOut(withDuration: duration)
+            let group = SKAction.group([move, fade])
+            let remove = SKAction.removeFromParent()
+            
+            particle.run(SKAction.sequence([group, remove]))
         }
     }
     
@@ -462,6 +605,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             node.removeFromParent()
         }
         enumerateChildNodes(withName: "bullet") { node, _ in
+            node.removeFromParent()
+        }
+        
+        // Entferne alle Herzen
+        enumerateChildNodes(withName: "heart") { node, _ in
             node.removeFromParent()
         }
         
