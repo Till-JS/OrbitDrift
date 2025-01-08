@@ -67,6 +67,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         setupPlayer()
         setupCrownControl()
         
+        // Setze initiale Position des Schiffs
+        if let ship = playerShip {
+            currentPlayerY = frame.height * 0.5
+            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
+            print("Initial ship position set to: \(ship.position)")
+        }
+        
         GameManager.shared.startGame()
     }
     
@@ -90,9 +97,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private func setupPlayer() {
         playerShip = SKSpriteNode(color: .cyan, size: CGSize(width: 15, height: 15))
         if let ship = playerShip {
-            // Positioniere das Schiff
-            currentPlayerY = frame.height / 2
+            // Setze initiale Position in der Mitte des Bildschirms
+            currentPlayerY = frame.height * 0.5  // 50% der Bildschirmhöhe
+            lastCrownValue = 0.5  // Setze Crown-Wert auf die Mitte
             ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
+            ship.zPosition = 10  // Stelle sicher, dass das Schiff über anderen Elementen liegt
             
             // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(rectangleOf: ship.size)
@@ -108,6 +117,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Richtet die Digital Crown Steuerung ein
     private func setupCrownControl() {
+        // Setze initiale Crown-Position
+        NotificationCenter.default.post(
+            name: Notification.Name("CrownDidRotate"),
+            object: nil,
+            userInfo: ["value": 0.5]  // Starte in der Mitte
+        )
+        
+        // Füge Observer hinzu
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleCrownRotation),
@@ -124,12 +141,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         guard GameManager.shared.isGameRunning else { return }
         
         guard let value = notification.userInfo?["value"] as? Double else { return }
+        lastCrownValue = value  // Speichere den letzten Wert
         
         if let ship = playerShip {
             // Berechne neue vertikale Position basierend auf Crown-Rotation
-            let newY = value * frame.height
-            currentPlayerY = newY
-            // Nur Y-Position aktualisieren, X-Position beibehalten
+            currentPlayerY = value * frame.height
             ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
         }
     }
@@ -264,7 +280,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
         gameOverLabel.text = "Game Over!"
         gameOverLabel.fontSize = 20
-        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 20)
+        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 30)
         gameOverLabel.name = "gameOverLabel"
         addChild(gameOverLabel)
         
@@ -272,15 +288,34 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let finalScoreLabel = SKLabelNode(fontNamed: "Helvetica")
         finalScoreLabel.text = "Score: \(GameManager.shared.score)"
         finalScoreLabel.fontSize = 16
-        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2)
-        finalScoreLabel.name = "gameOverLabel"  // Gleicher Name für einfaches Entfernen
+        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 10)
+        finalScoreLabel.name = "gameOverLabel"
         addChild(finalScoreLabel)
+        
+        // Highscore Label
+        let highscoreLabel = SKLabelNode(fontNamed: "Helvetica")
+        highscoreLabel.text = "Best: \(GameManager.shared.highscore)"
+        highscoreLabel.fontSize = 16
+        highscoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 10)
+        highscoreLabel.name = "gameOverLabel"
+        addChild(highscoreLabel)
+        
+        // New Highscore Indicator
+        if GameManager.shared.score >= GameManager.shared.highscore {
+            let newHighscoreLabel = SKLabelNode(fontNamed: "Helvetica")
+            newHighscoreLabel.text = "New Best!"
+            newHighscoreLabel.fontSize = 14
+            newHighscoreLabel.fontColor = .yellow
+            newHighscoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 30)
+            newHighscoreLabel.name = "gameOverLabel"
+            addChild(newHighscoreLabel)
+        }
         
         // Tap to Restart Label
         let tapLabel = SKLabelNode(fontNamed: "Helvetica")
         tapLabel.text = "Tap to Restart"
         tapLabel.fontSize = 16
-        tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 20)
+        tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 50)
         tapLabel.name = "tapLabel"
         addChild(tapLabel)
     }
@@ -296,11 +331,18 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         // Setze Spielerschiff zurück
-        playerShip?.position.y = frame.height / 2
-        playerShip?.position.x = frame.width * playerXPosition
+        currentPlayerY = frame.height * 0.5  // Zurück zur Mitte
+        playerShip?.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
         playerShip?.color = .cyan
         
         // Starte neues Spiel
         GameManager.shared.startGame()
+        
+        // Setze Crown-Position zurück
+        NotificationCenter.default.post(
+            name: Notification.Name("CrownDidRotate"),
+            object: nil,
+            userInfo: ["value": 0.5]  // Zurück zur Mitte
+        )
     }
 }

@@ -12,44 +12,29 @@
 
 import Foundation
 
-/// GameManager verwaltet den globalen Spielzustand
-/// Implementiert als Singleton für globalen Zugriff
+/// Verwaltet den Spielzustand und die Spiellogik
 class GameManager {
-    // MARK: - Singleton
-    
-    /// Shared instance für globalen Zugriff
+    /// Singleton-Instanz für globalen Zugriff
     static let shared = GameManager()
     
-    /// Private Initialisierung verhindert externe Instanziierung
-    private init() {}
+    // MARK: - Properties
     
-    // MARK: - Spielzustand
-    
-    /// Aktueller Punktestand des Spielers
+    /// Aktuelle Punktzahl
     private(set) var score: Int = 0
+    
+    /// Aktueller Highscore
+    private(set) var highscore: Int = UserDefaults.standard.integer(forKey: "highscore")
     
     /// Anzahl der verbleibenden Leben
     private(set) var lives: Int = 3
     
-    /// Bester jemals erreichter Punktestand
-    private(set) var highScore: Int {
-        get {
-            // Lade Highscore aus UserDefaults
-            UserDefaults.standard.integer(forKey: "HighScore")
-        }
-        set {
-            // Speichere neuen Highscore
-            UserDefaults.standard.set(newValue, forKey: "HighScore")
-        }
-    }
-    
-    /// Gibt an, ob das Spiel aktiv läuft
+    /// Gibt an, ob das Spiel läuft
     private(set) var isGameRunning: Bool = false
     
     /// Aktuelle Spielschwierigkeit (erhöht sich mit dem Score)
     private(set) var difficulty: Double = 1.0
     
-    // MARK: - Spielsteuerung
+    // MARK: - Game Control
     
     /// Startet ein neues Spiel
     /// - Setzt Score auf 0
@@ -63,14 +48,19 @@ class GameManager {
         isGameRunning = true
     }
     
-    /// Beendet das aktuelle Spiel
-    /// - Aktualisiert den Highscore wenn nötig
-    /// - Deaktiviert den Spielzustand
-    func endGame() {
-        if score > highScore {
-            highScore = score
+    /// Fügt Punkte zum aktuellen Score hinzu
+    /// - Parameter points: Anzahl der hinzuzufügenden Punkte
+    /// - Aktualisiert auch die Schwierigkeit basierend auf dem Score
+    func addScore(_ points: Int = 1) {
+        guard isGameRunning else { return }
+        
+        score += points
+        // Aktualisiere Highscore wenn nötig
+        if score > highscore {
+            highscore = score
+            UserDefaults.standard.set(highscore, forKey: "highscore")
         }
-        isGameRunning = false
+        updateDifficulty()
     }
     
     /// Verarbeitet eine Kollision
@@ -86,14 +76,15 @@ class GameManager {
         return false
     }
     
-    /// Erhöht den Punktestand um den angegebenen Wert
-    /// - Parameter points: Anzahl der hinzuzufügenden Punkte
-    /// - Aktualisiert auch die Schwierigkeit basierend auf dem Score
-    func addScore(_ points: Int = 1) {
-        guard isGameRunning else { return }
-        
-        score += points
-        updateDifficulty()
+    /// Beendet das aktuelle Spiel
+    /// - Aktualisiert den Highscore wenn nötig
+    /// - Deaktiviert den Spielzustand
+    func endGame() {
+        if score > highscore {
+            highscore = score
+            UserDefaults.standard.set(highscore, forKey: "highscore")
+        }
+        isGameRunning = false
     }
     
     // MARK: - Hilfsfunktionen
@@ -119,5 +110,11 @@ class GameManager {
     func getCurrentSpawnInterval() -> TimeInterval {
         let baseInterval = 2.0
         return baseInterval / difficulty
+    }
+    
+    // MARK: - Initialization
+    
+    private init() {
+        // Private Initialisierer für Singleton-Pattern
     }
 }
