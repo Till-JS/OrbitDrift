@@ -19,6 +19,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var lastUpdateTime: TimeInterval = 0    // Zeitpunkt des letzten Updates
     private var lastCrownValue: Double = 0.5       // Letzte Position der Digital Crown
     private var currentPlayerY: CGFloat = 0        // Aktuelle vertikale Position des Schiffs
+    private var targetPlayerY: CGFloat = 0         // Zielposition für sanfte Bewegung
+    private let playerMovementSpeed: CGFloat = 200.0 // Geschwindigkeit der Schiffbewegung
+    private let movementSmoothingFactor: CGFloat = 0.15 // Faktor für sanftere Bewegung
     
     /// Asteroiden-bezogene Eigenschaften
     private var lastAsteroidSpawn: TimeInterval = 0         // Zeitpunkt des letzten Asteroiden-Spawns
@@ -28,6 +31,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Schuss-bezogene Eigenschaften
     private let bulletSpeed: CGFloat = 300.0             // Geschwindigkeit der Schüsse
+    
+    /// UI-Elemente
+    private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
     
     /// Berechnet das aktuelle Spawn-Intervall basierend auf dem Score
     private var currentAsteroidInterval: TimeInterval {
@@ -49,8 +55,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         return 1 + Int(Double(score) / 500.0)
     }
     
-    /// UI-Elemente
-    private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
+    // MARK: - Initialization
+    
+    override init(size: CGSize) {
+        super.init(size: size)
+        print("Initializing GameScene with size: \(size)")
+    }
+    
+    required init?(coder aDecoder: NSCoder) {
+        super.init(coder: aDecoder)
+    }
     
     // MARK: - Scene Lifecycle
     
@@ -70,13 +84,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         setupUI()
         setupPlayer()
         setupCrownControl()
-        
-        // Setze initiale Position des Schiffs
-        if let ship = playerShip {
-            currentPlayerY = frame.height * 0.5
-            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
-            print("Initial ship position set to: \(ship.position)")
-        }
         
         GameManager.shared.startGame()
     }
@@ -118,12 +125,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         playerShip = ship
         
         if let ship = playerShip {
-            // Setze initiale Position in der Mitte des Bildschirms
-            currentPlayerY = frame.height * 0.5  // 50% der Bildschirmhöhe
-            lastCrownValue = 0.5  // Setze Crown-Wert auf die Mitte
-            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
-            ship.zPosition = 10  // Stelle sicher, dass das Schiff über anderen Elementen liegt
-            
             // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(polygonFrom: shipPath)
             ship.physicsBody?.categoryBitMask = PhysicsCategory.player
@@ -131,19 +132,23 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             ship.physicsBody?.collisionBitMask = 0  // Keine physische Kollision
             ship.physicsBody?.isDynamic = true
             
+            ship.zPosition = 10  // Stelle sicher, dass das Schiff über anderen Elementen liegt
+            
             addChild(ship)
-            print("Player setup at position: \(ship.position)")
+            print("Player setup")
         }
     }
     
     /// Richtet die Digital Crown Steuerung ein
     private func setupCrownControl() {
-        // Setze initiale Crown-Position
-        NotificationCenter.default.post(
-            name: Notification.Name("CrownDidRotate"),
-            object: nil,
-            userInfo: ["value": 0.5]  // Starte in der Mitte
-        )
+        // Setze initiale Position
+        currentPlayerY = frame.height * 0.5
+        targetPlayerY = currentPlayerY
+        lastCrownValue = 0.5
+        
+        if let ship = playerShip {
+            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
+        }
         
         // Füge Observer hinzu
         NotificationCenter.default.addObserver(
@@ -164,11 +169,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         guard let value = notification.userInfo?["value"] as? Double else { return }
         lastCrownValue = value  // Speichere den letzten Wert
         
-        if let ship = playerShip {
-            // Berechne neue vertikale Position basierend auf Crown-Rotation
-            currentPlayerY = value * frame.height
-            ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
-        }
+        // Setze neue Zielposition
+        targetPlayerY = CGFloat(value) * frame.height
     }
     
     // MARK: - Update Loop
@@ -187,6 +189,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let deltaTime = currentTime - lastUpdateTime
         lastUpdateTime = currentTime
         
+        // Aktualisiere Schiffposition
+        updatePlayerPosition(deltaTime)
+        
         // Spawn new asteroids
         if currentTime - lastAsteroidSpawn > currentAsteroidInterval {
             for _ in 1...currentAsteroidCount {
@@ -201,6 +206,28 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Update score
         GameManager.shared.addScore(1)
         updateScoreDisplay()
+    }
+    
+    /// Aktualisiert die Position des Spielerschiffs mit sanfter Bewegung
+    private func updatePlayerPosition(_ deltaTime: TimeInterval) {
+        guard let ship = playerShip else { return }
+        
+        // Berechne die Distanz zur Zielposition
+        let distance = targetPlayerY - currentPlayerY
+        
+        // Wenn wir nah genug an der Zielposition sind, keine Bewegung
+        if abs(distance) < 0.5 {
+            return
+        }
+        
+        // Sanfte Bewegung mit Lerp (Linear Interpolation)
+        currentPlayerY += distance * movementSmoothingFactor
+        
+        // Stelle sicher, dass wir innerhalb der Bildschirmgrenzen bleiben
+        currentPlayerY = max(0, min(frame.height, currentPlayerY))
+        
+        // Aktualisiere die Schiffposition
+        ship.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
     }
     
     // MARK: - Asteroiden Verwaltung

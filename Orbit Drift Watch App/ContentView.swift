@@ -14,48 +14,60 @@ struct ContentView: View {
     /// Aktuelle Rotation der Digital Crown (0.0 bis 1.0)
     @State private var crownRotation: Double = 0.5  // Start in der Mitte
     
+    /// Fokus-State für die Digital Crown
+    @FocusState private var isFocused: Bool
+    
     /// Controller für die Spielszene, verwaltet den Spielzustand
     @StateObject private var sceneController = GameSceneController()
     
     var body: some View {
-        // SpriteKit-Spielszene wird in SwiftUI eingebettet
-        SpriteView(scene: sceneController.scene, preferredFramesPerSecond: 60)
-            .ignoresSafeArea()  // Nutzt den gesamten verfügbaren Bildschirm
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .focusable()        // Ermöglicht Fokus für Digital Crown Eingaben
-            // Konfiguration der Digital Crown
-            .digitalCrownRotation(
-                $crownRotation,     // Binding zur Rotationsvariable
-                from: 0,            // Minimaler Wert
-                through: 1,         // Maximaler Wert
-                by: 0.001,         // Schrittweite für präzise Steuerung
-                sensitivity: .medium // Mittlere Empfindlichkeit für optimale Kontrolle
-            )
-            // Initiales Crown-Event senden
-            .onAppear {
-                NotificationCenter.default.post(
-                    name: Notification.Name("CrownDidRotate"),
-                    object: nil,
-                    userInfo: ["value": crownRotation]
+        GeometryReader { geometry in
+            // SpriteKit-Spielszene wird in SwiftUI eingebettet
+            SpriteView(scene: sceneController.scene, preferredFramesPerSecond: 60)
+                .ignoresSafeArea()  // Nutzt den gesamten verfügbaren Bildschirm
+                .focusable()        // Ermöglicht Fokus für Digital Crown Eingaben
+                .focused($isFocused)  // Bindet den Fokus-State
+                // Konfiguration der Digital Crown
+                .digitalCrownRotation(
+                    $crownRotation,     // Binding zur Rotationsvariable
+                    from: 0,            // Minimaler Wert
+                    through: 1,         // Maximaler Wert
+                    by: 0.002,         // Schrittweite für präzise Steuerung
+                    sensitivity: .low,  // Niedrigere Empfindlichkeit für bessere Kontrolle
+                    isContinuous: true,  // Erlaubt kontinuierliche Rotation
+                    isHapticFeedbackEnabled: false  // Deaktiviert Haptic Feedback
                 )
-            }
-            // Benachrichtigt die Spielszene über Änderungen der Crown-Position
-            .onChange(of: crownRotation) { _, newValue in
-                NotificationCenter.default.post(
-                    name: Notification.Name("CrownDidRotate"),
-                    object: nil,
-                    userInfo: ["value": newValue]
-                )
-            }
-            .onTapGesture {
-                // Wenn das Spiel vorbei ist, Neustart ermöglichen
-                if !GameManager.shared.isGameRunning {
-                    (sceneController.scene as? GameScene)?.restartGame()
-                } else {
-                    // Wenn das Spiel läuft, schießen
-                    (sceneController.scene as? GameScene)?.shoot()
+                .onAppear {
+                    // Setze initialen Fokus
+                    isFocused = true
+                    
+                    // Setze initiale Crown-Position
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        NotificationCenter.default.post(
+                            name: Notification.Name("CrownDidRotate"),
+                            object: nil,
+                            userInfo: ["value": crownRotation]
+                        )
+                    }
                 }
-            }
+                // Benachrichtigt die Spielszene über Änderungen der Crown-Position
+                .onChange(of: crownRotation) { _, newValue in
+                    NotificationCenter.default.post(
+                        name: Notification.Name("CrownDidRotate"),
+                        object: nil,
+                        userInfo: ["value": newValue]
+                    )
+                }
+                .onTapGesture {
+                    // Wenn das Spiel vorbei ist, Neustart ermöglichen
+                    if !GameManager.shared.isGameRunning {
+                        (sceneController.scene as? GameScene)?.restartGame()
+                    } else {
+                        // Wenn das Spiel läuft, schießen
+                        (sceneController.scene as? GameScene)?.shoot()
+                    }
+                }
+        }
     }
 }
 
@@ -64,13 +76,11 @@ class GameSceneController: ObservableObject {
     let scene: SKScene
     
     init() {
-        let scene = GameScene()
-        
         // Hole die tatsächliche Bildschirmgröße
         let screenSize = WKInterfaceDevice.current().screenBounds.size
         
-        // Setze die Scene-Größe auf die tatsächliche Bildschirmgröße
-        scene.size = screenSize
+        // Erstelle die Scene mit der korrekten Größe
+        let scene = GameScene(size: screenSize)
         scene.scaleMode = .aspectFill
         
         print("Creating scene with size: \(screenSize)")
