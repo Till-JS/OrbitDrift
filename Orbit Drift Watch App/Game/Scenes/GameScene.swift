@@ -14,7 +14,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Properties
     
     /// Spieler-bezogene Eigenschaften
-    private var playerShip: SKSpriteNode?          // Das Raumschiff-Sprite
+    private var playerShip: SKShapeNode?          // Das Raumschiff-Sprite
     private var lastUpdateTime: TimeInterval = 0    // Zeitpunkt des letzten Updates
     private var lastCrownValue: Double = 0.5       // Letzte Position der Digital Crown
     private var currentPlayerY: CGFloat = 0        // Aktuelle vertikale Position des Schiffs
@@ -95,7 +95,24 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Erstellt und konfiguriert das Spielerschiff
     private func setupPlayer() {
-        playerShip = SKSpriteNode(color: .cyan, size: CGSize(width: 15, height: 15))
+        // Erstelle ein dreieckiges Schiff
+        let shipPath = CGMutablePath()
+        let shipSize: CGFloat = 15.0
+        
+        // Dreieck-Pfad (nach rechts zeigend)
+        shipPath.move(to: CGPoint(x: -shipSize/2, y: -shipSize/2))     // Unten links
+        shipPath.addLine(to: CGPoint(x: shipSize/2, y: 0))             // Spitze rechts
+        shipPath.addLine(to: CGPoint(x: -shipSize/2, y: shipSize/2))   // Oben links
+        shipPath.closeSubpath()                                         // Zurück zum Start
+        
+        // Erstelle Shape Node mit dem Pfad
+        let ship = SKShapeNode(path: shipPath)
+        ship.fillColor = .cyan
+        ship.strokeColor = .clear  // Kein Rand
+        ship.lineWidth = 0
+        
+        playerShip = ship
+        
         if let ship = playerShip {
             // Setze initiale Position in der Mitte des Bildschirms
             currentPlayerY = frame.height * 0.5  // 50% der Bildschirmhöhe
@@ -104,7 +121,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             ship.zPosition = 10  // Stelle sicher, dass das Schiff über anderen Elementen liegt
             
             // Konfiguriere Physik-Körper für Kollisionserkennung
-            ship.physicsBody = SKPhysicsBody(rectangleOf: ship.size)
+            ship.physicsBody = SKPhysicsBody(polygonFrom: shipPath)
             ship.physicsBody?.categoryBitMask = PhysicsCategory.player
             ship.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid
             ship.physicsBody?.collisionBitMask = 0  // Keine physische Kollision
@@ -248,7 +265,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             // Visuelles Feedback basierend auf verbleibenden Leben
             // Prüfe zuerst auf Game Over
             if GameManager.shared.handleCollision() {
-                ship.color = .red     // Game Over - Schiff wird rot
+                ship.fillColor = .red     // Game Over - Schiff wird rot
                 showGameOver()
                 return
             }
@@ -256,13 +273,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             // Wenn nicht Game Over, setze Farbe basierend auf verbleibenden Leben
             switch GameManager.shared.lives {
             case 3:
-                ship.color = .cyan    // Volle Leben - Cyan
+                ship.fillColor = .cyan    // Volle Leben - Cyan
             case 2:
-                ship.color = .yellow  // Erste Warnung - Gelb
+                ship.fillColor = .yellow  // Erste Warnung - Gelb
             case 1:
-                ship.color = .orange  // Zweite Warnung - Orange
+                ship.fillColor = .orange  // Zweite Warnung - Orange
             default:
-                ship.color = .red     // Game Over - Rot
+                ship.fillColor = .red     // Game Over - Rot
             }
             
             // Blink-Animation
@@ -333,7 +350,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Setze Spielerschiff zurück
         currentPlayerY = frame.height * 0.5  // Zurück zur Mitte
         playerShip?.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
-        playerShip?.color = .cyan
+        playerShip?.fillColor = .cyan
         
         // Starte neues Spiel
         GameManager.shared.startGame()
