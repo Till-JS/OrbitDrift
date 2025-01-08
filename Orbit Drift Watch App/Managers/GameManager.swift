@@ -5,6 +5,7 @@
 // Der GameManager ist die zentrale Verwaltungsklasse für den Spielzustand.
 // Er verwaltet:
 // - Spielstand (Score)
+// - Leben des Spielers
 // - Spielzustand (laufend/beendet)
 // - Highscore-System
 // - Spielschwierigkeit
@@ -26,6 +27,9 @@ class GameManager {
     
     /// Aktueller Punktestand des Spielers
     private(set) var score: Int = 0
+    
+    /// Anzahl der verbleibenden Leben
+    private(set) var lives: Int = 3
     
     /// Bester jemals erreichter Punktestand
     private(set) var highScore: Int {
@@ -49,10 +53,12 @@ class GameManager {
     
     /// Startet ein neues Spiel
     /// - Setzt Score auf 0
+    /// - Setzt Leben auf 3
     /// - Setzt Schwierigkeit zurück
     /// - Aktiviert den Spielzustand
     func startGame() {
         score = 0
+        lives = 3
         difficulty = 1.0
         isGameRunning = true
     }
@@ -65,6 +71,19 @@ class GameManager {
             highScore = score
         }
         isGameRunning = false
+    }
+    
+    /// Verarbeitet eine Kollision
+    /// - Returns: True wenn Game Over, False wenn noch Leben übrig
+    func handleCollision() -> Bool {
+        guard isGameRunning else { return true }
+        
+        lives -= 1
+        if lives <= 0 {
+            endGame()
+            return true
+        }
+        return false
     }
     
     /// Erhöht den Punktestand um den angegebenen Wert

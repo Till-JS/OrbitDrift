@@ -38,6 +38,12 @@ struct ContentView: View {
                     userInfo: ["value": newValue]
                 )
             }
+            .onTapGesture {
+                // Wenn das Spiel vorbei ist, Neustart ermöglichen
+                if !GameManager.shared.isGameRunning {
+                    (sceneController.scene as? GameScene)?.restartGame()
+                }
+            }
     }
 }
 

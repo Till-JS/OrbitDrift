@@ -1,5 +1,6 @@
 import SpriteKit
 import WatchKit
+import UIKit
 
 /// Definiert die verschiedenen Physik-Kategorien für Kollisionserkennung
 struct PhysicsCategory {
@@ -112,6 +113,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Wird regelmäßig aufgerufen, um das Spiel zu aktualisieren
     override func update(_ currentTime: TimeInterval) {
+        // Prüfe, ob das Spiel noch läuft
+        guard GameManager.shared.isGameRunning else { return }
+        
         if lastUpdateTime == 0 {
             lastUpdateTime = currentTime
             lastAsteroidSpawn = currentTime
@@ -131,10 +135,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         updateAsteroids(deltaTime)
         
         // Update score
-        if GameManager.shared.isPlaying {
-            GameManager.shared.addScore(1)
-            updateScoreDisplay()
-        }
+        GameManager.shared.addScore(1)
+        updateScoreDisplay()
     }
     
     // MARK: - Asteroiden Verwaltung
@@ -197,22 +199,30 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             // Vibration feedback
             WKInterfaceDevice.current().play(.notification)
             
-            // Change color based on remaining lives
-            switch GameManager.shared.lives {
-            case 3:
-                ship.color = .gray  // First hit: change to gray
-            case 2:
-                ship.color = .red   // Second hit: change to red
-            default:
-                if GameManager.shared.handleCollision() {
-                    showGameOver()
-                }
+            // Visuelles Feedback basierend auf verbleibenden Leben
+            // Prüfe zuerst auf Game Over
+            if GameManager.shared.handleCollision() {
+                ship.color = .gray   // Game Over
+                showGameOver()
+                return
             }
             
-            // Handle collision in GameManager
-            if GameManager.shared.handleCollision() {
-                showGameOver()
+            // Wenn nicht Game Over, setze Farbe basierend auf verbleibenden Leben
+            switch GameManager.shared.lives {
+            case 3:
+                ship.color = .cyan   // Volle Leben
+            case 2:
+                ship.color = .yellow // Erste Warnung
+            case 1:
+                ship.color = .red    // Kritischer Zustand
+            default:
+                ship.color = .gray   // Sollte nicht vorkommen
             }
+            
+            // Blink-Animation
+            let fadeOut = SKAction.fadeAlpha(to: 0.5, duration: 0.2)
+            let fadeIn = SKAction.fadeAlpha(to: 1.0, duration: 0.2)
+            ship.run(SKAction.sequence([fadeOut, fadeIn]))
         }
     }
     
@@ -220,25 +230,51 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// Zeigt das Game Over-Menü an
     private func showGameOver() {
+        // Game Over Label
         let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
         gameOverLabel.text = "Game Over!"
         gameOverLabel.fontSize = 20
-        gameOverLabel.position = CGPoint(x: frame.midX, y: frame.midY)
+        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 20)
+        gameOverLabel.name = "gameOverLabel"
         addChild(gameOverLabel)
         
-        let scoreLabel = SKLabelNode(fontNamed: "Helvetica")
-        scoreLabel.text = "Score: \(GameManager.shared.score)"
-        scoreLabel.fontSize = 16
-        scoreLabel.position = CGPoint(x: frame.midX, y: frame.midY - 25)
-        addChild(scoreLabel)
+        // Score Label
+        let finalScoreLabel = SKLabelNode(fontNamed: "Helvetica")
+        finalScoreLabel.text = "Score: \(GameManager.shared.score)"
+        finalScoreLabel.fontSize = 16
+        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2)
+        finalScoreLabel.name = "gameOverLabel"  // Gleicher Name für einfaches Entfernen
+        addChild(finalScoreLabel)
         
-        let restartLabel = SKLabelNode(fontNamed: "Helvetica")
-        restartLabel.text = "Tap to restart"
-        restartLabel.fontSize = 14
-        restartLabel.position = CGPoint(x: frame.midX, y: frame.midY - 50)
-        addChild(restartLabel)
+        // Tap to Restart Label
+        let tapLabel = SKLabelNode(fontNamed: "Helvetica")
+        tapLabel.text = "Tap to Restart"
+        tapLabel.fontSize = 16
+        tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 20)
+        tapLabel.name = "tapLabel"
+        addChild(tapLabel)
         
-        // Stop spawning asteroids
-        isPaused = true
+        // Entferne alle Asteroiden
+        enumerateChildNodes(withName: "asteroid") { node, _ in
+            node.removeFromParent()
+        }
+    }
+    
+    /// Startet ein neues Spiel
+    func restartGame() {
+        // Entferne Game Over Labels
+        enumerateChildNodes(withName: "gameOverLabel") { node, _ in
+            node.removeFromParent()
+        }
+        enumerateChildNodes(withName: "tapLabel") { node, _ in
+            node.removeFromParent()
+        }
+        
+        // Setze Spielerschiff zurück
+        playerShip?.position.y = frame.height / 2
+        playerShip?.color = .cyan
+        
+        // Starte neues Spiel
+        GameManager.shared.startGame()
     }
 }
