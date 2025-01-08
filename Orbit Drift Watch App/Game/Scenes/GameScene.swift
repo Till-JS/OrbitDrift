@@ -457,8 +457,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             node.removeFromParent()
         }
         
+        // Entferne alle Asteroiden und Schüsse
+        enumerateChildNodes(withName: "asteroid") { node, _ in
+            node.removeFromParent()
+        }
+        enumerateChildNodes(withName: "bullet") { node, _ in
+            node.removeFromParent()
+        }
+        
         // Setze Spielerschiff zurück
         currentPlayerY = frame.height * 0.5  // Zurück zur Mitte
+        targetPlayerY = currentPlayerY       // Setze auch Zielposition zurück
         playerShip?.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
         playerShip?.fillColor = .cyan
         
