@@ -1,6 +1,11 @@
+//
+//  GameScene.swift
+//  Orbit Drift Watch App
+//
+
 import SpriteKit
 import WatchKit
-import UIKit
+import SwiftUI
 
 /// Definiert die verschiedenen Physik-Kategorien für Kollisionserkennung
 struct PhysicsCategory {
@@ -40,6 +45,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     /// UI-Elemente
     private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
+    public private(set) var canRestartGame: Bool = true // Verhindert zu schnelles Neustarten
     
     /// Berechnet das aktuelle Spawn-Intervall basierend auf dem Score
     private var currentAsteroidInterval: TimeInterval {
@@ -83,15 +89,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         physicsWorld.gravity = .zero           // Deaktiviert Schwerkraft
         
         // Setze Weltraum-Hintergrund
-        backgroundColor = .init(red: 0.04, green: 0.04, blue: 0.16, alpha: 1.0)
-        print("Scene loaded with size: \(frame.size)")
+        backgroundColor = .black
         
         // Initialisiere Spielkomponenten
         setupUI()
         setupPlayer()
         setupCrownControl()
-        
-        GameManager.shared.startGame()
     }
     
     // MARK: - Setup Methods
@@ -435,6 +438,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Bonus-Punkte für zerstörten Asteroiden
         GameManager.shared.addScore(50)
+        GameManager.shared.addDestroyedAsteroid()
+        showBonusPoints(50)
     }
     
     /// Verarbeitet die Kollision zwischen Spieler und Herz
@@ -447,9 +452,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Füge ein Leben hinzu
         GameManager.shared.addLife()
+        GameManager.shared.addCollectedHeart()
         
         // Bonus-Punkte für gesammeltes Herz
         GameManager.shared.addScore(100)
+        showBonusPoints(100)
         
         // Visuelles und haptisches Feedback
         if let ship = playerShip {
@@ -517,6 +524,29 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
     }
     
+    /// Zeigt eine Animation für Bonus-Punkte
+    private func showBonusPoints(_ points: Int) {
+        guard let scoreLabel = scoreLabel else { return }
+        
+        let bonusLabel = SKLabelNode(fontNamed: "Helvetica")
+        bonusLabel.text = "+\(points)"
+        bonusLabel.fontSize = 14
+        bonusLabel.fontColor = .yellow
+        bonusLabel.horizontalAlignmentMode = .right
+        bonusLabel.verticalAlignmentMode = .bottom
+        bonusLabel.position = CGPoint(x: scoreLabel.position.x - 40, y: scoreLabel.position.y)
+        bonusLabel.alpha = 0
+        addChild(bonusLabel)
+        
+        // Fade in, warte, fade out und entfernen
+        let fadeIn = SKAction.fadeIn(withDuration: 0.2)
+        let wait = SKAction.wait(forDuration: 0.5)
+        let fadeOut = SKAction.fadeOut(withDuration: 0.3)
+        let remove = SKAction.removeFromParent()
+        
+        bonusLabel.run(SKAction.sequence([fadeIn, wait, fadeOut, remove]))
+    }
+    
     /// Schießt einen Schuss vom Spielerschiff ab
     public func shoot() {
         guard let ship = playerShip, GameManager.shared.isGameRunning else { return }
@@ -553,29 +583,52 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Score Label ausblenden
         scoreLabel?.isHidden = true
         
+        // Verhindere sofortiges Neustarten
+        canRestartGame = false
+        
         // Game Over Label
         let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
         gameOverLabel.text = "Game Over!"
-        gameOverLabel.fontSize = 20
-        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 30)
+        gameOverLabel.fontSize = 24
+        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 40)
         gameOverLabel.name = "gameOverLabel"
         addChild(gameOverLabel)
         
-        // Score Label
+        // Final Score Label
         let finalScoreLabel = SKLabelNode(fontNamed: "Helvetica")
         finalScoreLabel.text = "Score: \(GameManager.shared.score)"
-        finalScoreLabel.fontSize = 16
+        finalScoreLabel.fontSize = 18
         finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 10)
         finalScoreLabel.name = "gameOverLabel"
         addChild(finalScoreLabel)
+        
+        // Statistik Labels
+        let asteroidsLabel = SKLabelNode(fontNamed: "Helvetica")
+        asteroidsLabel.text = "Asteroids: \(GameManager.shared.destroyedAsteroids)"
+        asteroidsLabel.fontSize = 14
+        asteroidsLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 15)
+        asteroidsLabel.name = "gameOverLabel"
+        addChild(asteroidsLabel)
+        
+        let heartsLabel = SKLabelNode(fontNamed: "Helvetica")
+        heartsLabel.text = "Hearts: \(GameManager.shared.collectedHearts)"
+        heartsLabel.fontSize = 14
+        heartsLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 35)
+        heartsLabel.name = "gameOverLabel"
+        addChild(heartsLabel)
         
         // Tap to Restart Label
         let tapLabel = SKLabelNode(fontNamed: "Helvetica")
         tapLabel.text = "Tap to Restart"
         tapLabel.fontSize = 16
-        tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 50)
-        tapLabel.name = "tapLabel"
+        tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 60)
+        tapLabel.name = "gameOverLabel"
         addChild(tapLabel)
+        
+        // Erlaube Neustarten nach einer kurzen Verzögerung
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.canRestartGame = true
+        }
     }
     
     /// Startet ein neues Spiel

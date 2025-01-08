@@ -27,6 +27,21 @@ struct ContentView: View {
                 .ignoresSafeArea()  // Nutzt den gesamten verfügbaren Bildschirm
                 .focusable()        // Ermöglicht Fokus für Digital Crown Eingaben
                 .focused($isFocused)  // Bindet den Fokus-State
+                .onTapGesture {
+                    guard let gameScene = sceneController.scene as? GameScene else { return }
+                    
+                    // Wenn das Spiel läuft, schieße
+                    if GameManager.shared.isGameRunning {
+                        gameScene.shoot()
+                        return
+                    }
+                    
+                    // Wenn Game Over und Neustarten erlaubt ist
+                    if gameScene.canRestartGame {
+                        GameManager.shared.startGame()
+                        gameScene.restartGame()
+                    }
+                }
                 // Konfiguration der Digital Crown
                 .digitalCrownRotation(
                     $crownRotation,     // Binding zur Rotationsvariable
@@ -57,15 +72,6 @@ struct ContentView: View {
                         object: nil,
                         userInfo: ["value": newValue]
                     )
-                }
-                .onTapGesture {
-                    // Wenn das Spiel vorbei ist, Neustart ermöglichen
-                    if !GameManager.shared.isGameRunning {
-                        (sceneController.scene as? GameScene)?.restartGame()
-                    } else {
-                        // Wenn das Spiel läuft, schießen
-                        (sceneController.scene as? GameScene)?.shoot()
-                    }
                 }
         }
     }

@@ -25,6 +25,12 @@ class GameManager {
     /// Aktueller Highscore
     private(set) var highscore: Int = UserDefaults.standard.integer(forKey: "highscore")
     
+    /// Anzahl der zerstörten Asteroiden in dieser Runde
+    private(set) var destroyedAsteroids: Int = 0
+    
+    /// Anzahl der gesammelten Leben in dieser Runde
+    private(set) var collectedHearts: Int = 0
+    
     /// Anzahl der verbleibenden Leben
     private(set) var lives: Int = 3
     
@@ -45,6 +51,8 @@ class GameManager {
         score = 0
         lives = 3
         difficulty = 1.0
+        destroyedAsteroids = 0
+        collectedHearts = 0
         isGameRunning = true
     }
     
@@ -91,6 +99,16 @@ class GameManager {
     func addLife() {
         guard isGameRunning, lives < 3 else { return }
         lives += 1
+    }
+    
+    /// Registriert einen zerstörten Asteroiden
+    func addDestroyedAsteroid() {
+        destroyedAsteroids += 1
+    }
+    
+    /// Registriert ein gesammeltes Herz
+    func addCollectedHeart() {
+        collectedHearts += 1
     }
     
     // MARK: - Hilfsfunktionen
