@@ -309,15 +309,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         bullet?.removeFromParent()
         asteroid?.removeFromParent()
         
-        // Erstelle Explosionseffekt
+        // Erstelle Explosion an der Position des Asteroiden
         if let position = asteroid?.position {
             createExplosion(at: position)
         }
         
+        // Erhöhe den Punktestand
+        GameManager.shared.addScore(100)
+        
         // Bonus-Punkte für zerstörten Asteroiden
-        GameManager.shared.addScore(50)
         GameManager.shared.addDestroyedAsteroid()
-        showBonusPoints(50)
+        showBonusPoints(100)
         
         // Sound für zerstörten Asteroiden
         WKInterfaceDevice.current().play(.directionUp)
@@ -335,9 +337,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         GameManager.shared.addLife()
         GameManager.shared.addCollectedHeart()
         
-        // Bonus-Punkte für gesammeltes Herz
-        GameManager.shared.addScore(100)
-        showBonusPoints(100)
+        // Erhöhe den Punktestand
+        GameManager.shared.addScore(500)
+        showBonusPoints(500)
         
         // Erstelle Sammel-Effekt
         if let position = heart?.position {
@@ -356,8 +358,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let shield = contact.bodyA.categoryBitMask == PhysicsCategory.shield ? contact.bodyA.node : contact.bodyB.node
         shield?.removeFromParent()
         
-        // Aktiviere den Schutzschild
-        activateShield()
+        // Erhöhe den Punktestand
+        GameManager.shared.addScore(250)
+        showBonusPoints(250)
+        
+        // Aktiviere den Schutzschild nur wenn keiner aktiv ist
+        if !shieldActive {
+            activateShield()
+        }
     }
     
     private func handleShieldCollision(_ contact: SKPhysicsContact) {
@@ -416,15 +424,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private func updateShipColor() {
         guard let ship = playerShip else { return }
         
-        switch GameManager.shared.lives {
-        case 3:
-            ship.fillColor = .cyan    // Volle Leben - Cyan
-        case 2:
-            ship.fillColor = .yellow  // Erste Warnung - Gelb
-        case 1:
-            ship.fillColor = .orange  // Zweite Warnung - Orange
-        default:
-            ship.fillColor = .red     // Game Over - Rot
+        // Setze die Grundfarbe auf Cyan
+        ship.fillColor = .cyan
+        
+        // Wenn weniger als 2 Leben übrig sind, färbe orange
+        if GameManager.shared.lives < 2 {
+            ship.fillColor = .orange
         }
     }
     
@@ -553,5 +558,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     public func restartGame() {
         gameOverManager?.restartGame()
+        
+        // Setze Schutzschild-Status zurück
+        shieldActive = false
+        shieldNode?.removeFromParent()
+        shieldNode = nil
+        
+        // Aktualisiere die Schiffsfarbe
+        updateShipColor()
     }
 }
