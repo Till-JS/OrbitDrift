@@ -590,65 +590,179 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         WKInterfaceDevice.current().play(.failure)
         
         // Game Over Label
-        let gameOverLabel = SKLabelNode(fontNamed: "Helvetica")
-        gameOverLabel.text = "Game Over!"
-        gameOverLabel.fontSize = 24
-        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 40)
+        let gameOverLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
+        gameOverLabel.text = "GAME OVER"
+        gameOverLabel.fontSize = 20
+        gameOverLabel.fontColor = .red
+        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 40)
         gameOverLabel.name = "gameOverLabel"
         addChild(gameOverLabel)
         
         // Final Score Label
-        let finalScoreLabel = SKLabelNode(fontNamed: "Helvetica")
+        let finalScoreLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
         finalScoreLabel.text = "Score: \(GameManager.shared.score)"
         finalScoreLabel.fontSize = 18
-        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 + 10)
-        finalScoreLabel.name = "gameOverLabel"
+        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 70)
+        finalScoreLabel.name = "finalScoreLabel"
         addChild(finalScoreLabel)
         
-        // Statistik Labels
-        let asteroidsLabel = SKLabelNode(fontNamed: "Helvetica")
-        asteroidsLabel.text = "Asteroids: \(GameManager.shared.destroyedAsteroids)"
-        asteroidsLabel.fontSize = 14
-        asteroidsLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 15)
-        asteroidsLabel.name = "gameOverLabel"
-        addChild(asteroidsLabel)
+        // Highscores Label
+        let highscoresLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
+        highscoresLabel.text = "Top 10"
+        highscoresLabel.fontSize = 16
+        highscoresLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 100)
+        highscoresLabel.name = "highscoresLabel"
+        addChild(highscoresLabel)
         
-        let heartsLabel = SKLabelNode(fontNamed: "Helvetica")
-        heartsLabel.text = "Hearts: \(GameManager.shared.collectedHearts)"
-        heartsLabel.fontSize = 14
-        heartsLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 35)
-        heartsLabel.name = "gameOverLabel"
-        addChild(heartsLabel)
+        // Highscores Liste
+        let highscores = GameManager.shared.highscores
         
-        // Tap to Restart Label
-        let tapLabel = SKLabelNode(fontNamed: "Helvetica")
-        tapLabel.text = "Tap to Restart"
-        tapLabel.fontSize = 16
-        tapLabel.position = CGPoint(x: frame.width / 2, y: frame.height / 2 - 60)
-        tapLabel.name = "gameOverLabel"
-        addChild(tapLabel)
+        // #1 - Größter Score
+        if highscores.count > 0 {
+            let scoreLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
+            scoreLabel.text = "1. \(highscores[0])"
+            scoreLabel.fontSize = 14
+            scoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 125)
+            scoreLabel.name = "highscore0"
+            addChild(scoreLabel)
+        }
         
-        // Erlaube Neustarten nach einer kurzen Verzögerung
+        // #2 & #3 - Nebeneinander
+        if highscores.count > 1 {
+            let score2Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score2Label.text = "2. \(highscores[1])"
+            score2Label.fontSize = 13
+            score2Label.position = CGPoint(x: frame.width / 3, y: frame.height - 142)
+            score2Label.name = "highscore1"
+            addChild(score2Label)
+        }
+        
+        if highscores.count > 2 {
+            let score3Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score3Label.text = "3. \(highscores[2])"
+            score3Label.fontSize = 13
+            score3Label.position = CGPoint(x: (frame.width * 2) / 3, y: frame.height - 142)
+            score3Label.name = "highscore2"
+            addChild(score3Label)
+        }
+        
+        // #4, #5 & #6 - Nebeneinander und kleiner
+        let y456Position = frame.height - 157
+        if highscores.count > 3 {
+            let score4Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score4Label.text = "4. \(highscores[3])"
+            score4Label.fontSize = 11
+            score4Label.position = CGPoint(x: frame.width / 4, y: y456Position)
+            score4Label.name = "highscore3"
+            addChild(score4Label)
+        }
+        
+        if highscores.count > 4 {
+            let score5Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score5Label.text = "5. \(highscores[4])"
+            score5Label.fontSize = 11
+            score5Label.position = CGPoint(x: frame.width / 2, y: y456Position)
+            score5Label.name = "highscore4"
+            addChild(score5Label)
+        }
+        
+        if highscores.count > 5 {
+            let score6Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score6Label.text = "6. \(highscores[5])"
+            score6Label.fontSize = 11
+            score6Label.position = CGPoint(x: (frame.width * 3) / 4, y: y456Position)
+            score6Label.name = "highscore5"
+            addChild(score6Label)
+        }
+        
+        // #7, #8, #9 & #10 - Nebeneinander und noch kleiner
+        let y7810Position = frame.height - 170
+        if highscores.count > 6 {
+            let score7Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score7Label.text = "7. \(highscores[6])"
+            score7Label.fontSize = 9
+            score7Label.position = CGPoint(x: frame.width / 5, y: y7810Position)
+            score7Label.name = "highscore6"
+            addChild(score7Label)
+        }
+        
+        if highscores.count > 7 {
+            let score8Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score8Label.text = "8. \(highscores[7])"
+            score8Label.fontSize = 9
+            score8Label.position = CGPoint(x: (frame.width * 2) / 5, y: y7810Position)
+            score8Label.name = "highscore7"
+            addChild(score8Label)
+        }
+        
+        if highscores.count > 8 {
+            let score9Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score9Label.text = "9. \(highscores[8])"
+            score9Label.fontSize = 9
+            score9Label.position = CGPoint(x: (frame.width * 3) / 5, y: y7810Position)
+            score9Label.name = "highscore8"
+            addChild(score9Label)
+        }
+        
+        if highscores.count > 9 {
+            let score10Label = SKLabelNode(fontNamed: "Helvetica-Bold")
+            score10Label.text = "10. \(highscores[9])"
+            score10Label.fontSize = 9
+            score10Label.position = CGPoint(x: (frame.width * 4) / 5, y: y7810Position)
+            score10Label.name = "highscore9"
+            addChild(score10Label)
+        }
+        
+        // Tap to Restart Label (nach 1 Sekunde anzeigen)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.canRestartGame = true
+            let tapLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
+            tapLabel.text = "Tap to Restart"
+            tapLabel.fontSize = 12
+            tapLabel.position = CGPoint(x: self.frame.width / 2, y: 20)
+            tapLabel.name = "tapLabel"
+            tapLabel.alpha = 0
+            self.addChild(tapLabel)
+            
+            // Fade-In Animation
+            let fadeIn = SKAction.fadeIn(withDuration: 0.5)
+            tapLabel.run(fadeIn)
         }
     }
     
-    /// Startet ein neues Spiel
-    func restartGame() {
-        // Entferne Game Over Labels
+    /// Entfernt alle Game Over Elemente
+    private func removeGameOverElements() {
+        // Entferne alle Labels mit spezifischen Namen
         enumerateChildNodes(withName: "gameOverLabel") { node, _ in
+            node.removeFromParent()
+        }
+        enumerateChildNodes(withName: "finalScoreLabel") { node, _ in
+            node.removeFromParent()
+        }
+        enumerateChildNodes(withName: "highscoresLabel") { node, _ in
             node.removeFromParent()
         }
         enumerateChildNodes(withName: "tapLabel") { node, _ in
             node.removeFromParent()
         }
-        
-        // Entferne alle Asteroiden und Schüsse
-        enumerateChildNodes(withName: "asteroid") { node, _ in
-            node.removeFromParent()
+        // Entferne alle Highscore Labels
+        for i in 0..<10 {
+            enumerateChildNodes(withName: "highscore\(i)") { node, _ in
+                node.removeFromParent()
+            }
         }
-        enumerateChildNodes(withName: "bullet") { node, _ in
+        
+        // Score Label wieder einblenden
+        scoreLabel?.isHidden = false
+    }
+    
+    /// Startet das Spiel neu
+    func restartGame() {
+        // Entferne Game Over Elemente
+        removeGameOverElements()
+        
+        // Entferne alle Asteroiden
+        enumerateChildNodes(withName: "asteroid") { node, _ in
             node.removeFromParent()
         }
         
@@ -657,9 +771,12 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             node.removeFromParent()
         }
         
-        // Setze Spielerschiff zurück
-        currentPlayerY = frame.height * 0.5  // Zurück zur Mitte
-        playerShip?.position = CGPoint(x: frame.width * playerXPosition, y: currentPlayerY)
+        // Entferne alle Schüsse
+        enumerateChildNodes(withName: "bullet") { node, _ in
+            node.removeFromParent()
+        }
+        
+        // Setze Schifffarbe zurück
         playerShip?.fillColor = .cyan
         
         // Starte neues Spiel
@@ -671,9 +788,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             object: nil,
             userInfo: ["value": 0.5]  // Zurück zur Mitte
         )
-        
-        // Score Label wieder einblenden
-        scoreLabel?.isHidden = false
         
         // Aktualisiere Schifffarbe
         updateShipColor()

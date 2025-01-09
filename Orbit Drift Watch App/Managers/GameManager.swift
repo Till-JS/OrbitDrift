@@ -12,6 +12,13 @@
 
 import Foundation
 
+/// Struktur für ein einzelnes Spielergebnis
+struct GameScore: Codable {
+    let score: Int
+    let destroyedAsteroids: Int
+    let collectedHearts: Int
+}
+
 /// Verwaltet den Spielzustand und die Spiellogik
 class GameManager {
     /// Singleton-Instanz für globalen Zugriff
@@ -24,6 +31,18 @@ class GameManager {
     
     /// Aktueller Highscore
     private(set) var highscore: Int = UserDefaults.standard.integer(forKey: "highscore")
+    
+    /// Liste der Top 10 Highscores
+    private(set) var highscores: [Int] = UserDefaults.standard.array(forKey: "highscores") as? [Int] ?? []
+    
+    /// Alle Spielergebnisse
+    private(set) var allGames: [GameScore] = {
+        if let data = UserDefaults.standard.data(forKey: "allGames"),
+           let decoded = try? JSONDecoder().decode([GameScore].self, from: data) {
+            return decoded
+        }
+        return []
+    }()
     
     /// Anzahl der zerstörten Asteroiden in dieser Runde
     private(set) var destroyedAsteroids: Int = 0
@@ -92,6 +111,30 @@ class GameManager {
             highscore = score
             UserDefaults.standard.set(highscore, forKey: "highscore")
         }
+        
+        // Füge aktuellen Score zu Highscores hinzu
+        highscores.append(score)
+        // Sortiere absteigend und behalte nur die Top 10
+        highscores.sort(by: >)
+        if highscores.count > 10 {
+            highscores = Array(highscores.prefix(10))
+        }
+        // Speichere die aktualisierten Highscores
+        UserDefaults.standard.set(highscores, forKey: "highscores")
+        
+        // Erstelle und speichere das Spielergebnis
+        let gameScore = GameScore(
+            score: score,
+            destroyedAsteroids: destroyedAsteroids,
+            collectedHearts: collectedHearts
+        )
+        allGames.append(gameScore)
+        
+        // Speichere alle Spiele
+        if let encoded = try? JSONEncoder().encode(allGames) {
+            UserDefaults.standard.set(encoded, forKey: "allGames")
+        }
+        
         isGameRunning = false
     }
     
@@ -134,6 +177,30 @@ class GameManager {
     func getCurrentSpawnInterval() -> TimeInterval {
         let baseInterval = 2.0
         return baseInterval / difficulty
+    }
+    
+    /// Gibt die formatierten Top 10 Scores zurück
+    func getFormattedTopScores() -> [(score: Int, date: String)] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .short
+        dateFormatter.timeStyle = .short
+        
+        // Sortiere alle Spiele nach Punktzahl (absteigend)
+        let sortedGames = allGames.sorted { $0.score > $1.score }
+        
+        // Nimm die Top 10 und formatiere sie
+        return sortedGames.prefix(10).map { game in
+            (score: game.score, date: dateFormatter.string(from: Date()))
+        }
+    }
+    
+    /// Gibt die Gesamtstatistik zurück
+    func getTotalStats() -> (totalGames: Int, averageScore: Int, bestScore: Int) {
+        let totalGames = allGames.count
+        let averageScore = totalGames > 0 ? allGames.map { $0.score }.reduce(0, +) / totalGames : 0
+        let bestScore = allGames.map { $0.score }.max() ?? 0
+        
+        return (totalGames: totalGames, averageScore: averageScore, bestScore: bestScore)
     }
     
     // MARK: - Initialization
