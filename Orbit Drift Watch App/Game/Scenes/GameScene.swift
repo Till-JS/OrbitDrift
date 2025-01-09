@@ -594,23 +594,24 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         gameOverLabel.text = "GAME OVER"
         gameOverLabel.fontSize = 20
         gameOverLabel.fontColor = .red
-        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 40)
+        gameOverLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 60)
         gameOverLabel.name = "gameOverLabel"
         addChild(gameOverLabel)
         
         // Final Score Label
         let finalScoreLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
         finalScoreLabel.text = "Score: \(GameManager.shared.score)"
-        finalScoreLabel.fontSize = 18
-        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 70)
+        finalScoreLabel.fontSize = 22
+        finalScoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 90)
         finalScoreLabel.name = "finalScoreLabel"
         addChild(finalScoreLabel)
         
         // Highscores Label
         let highscoresLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
-        highscoresLabel.text = "Top 10"
+        highscoresLabel.text = "Highscores"
         highscoresLabel.fontSize = 16
-        highscoresLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 100)
+        highscoresLabel.fontColor = .cyan
+        highscoresLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 115)
         highscoresLabel.name = "highscoresLabel"
         addChild(highscoresLabel)
         
@@ -622,7 +623,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             let scoreLabel = SKLabelNode(fontNamed: "Helvetica-Bold")
             scoreLabel.text = "1. \(highscores[0])"
             scoreLabel.fontSize = 14
-            scoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 125)
+            scoreLabel.position = CGPoint(x: frame.width / 2, y: frame.height - 140)
             scoreLabel.name = "highscore0"
             addChild(scoreLabel)
         }
@@ -632,7 +633,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             let score2Label = SKLabelNode(fontNamed: "Helvetica-Bold")
             score2Label.text = "2. \(highscores[1])"
             score2Label.fontSize = 13
-            score2Label.position = CGPoint(x: frame.width / 3, y: frame.height - 142)
+            score2Label.position = CGPoint(x: frame.width / 3, y: frame.height - 157)
             score2Label.name = "highscore1"
             addChild(score2Label)
         }
@@ -641,13 +642,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             let score3Label = SKLabelNode(fontNamed: "Helvetica-Bold")
             score3Label.text = "3. \(highscores[2])"
             score3Label.fontSize = 13
-            score3Label.position = CGPoint(x: (frame.width * 2) / 3, y: frame.height - 142)
+            score3Label.position = CGPoint(x: (frame.width * 2) / 3, y: frame.height - 157)
             score3Label.name = "highscore2"
             addChild(score3Label)
         }
         
         // #4, #5 & #6 - Nebeneinander und kleiner
-        let y456Position = frame.height - 157
+        let y456Position = frame.height - 172
         if highscores.count > 3 {
             let score4Label = SKLabelNode(fontNamed: "Helvetica-Bold")
             score4Label.text = "4. \(highscores[3])"
@@ -676,7 +677,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         
         // #7, #8, #9 & #10 - Nebeneinander und noch kleiner
-        let y7810Position = frame.height - 170
+        let y7810Position = frame.height - 187
         if highscores.count > 6 {
             let score7Label = SKLabelNode(fontNamed: "Helvetica-Bold")
             score7Label.text = "7. \(highscores[6])"
