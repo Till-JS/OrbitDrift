@@ -7,15 +7,6 @@ import SpriteKit
 import WatchKit
 import SwiftUI
 
-/// Definiert die verschiedenen Physik-Kategorien für Kollisionserkennung
-struct PhysicsCategory {
-    static let none      : UInt32 = 0         // Keine Kategorie
-    static let player    : UInt32 = 0b1       // Spielerschiff (Bit 1)
-    static let asteroid  : UInt32 = 0b10      // Asteroiden (Bit 2)
-    static let bullet    : UInt32 = 0b100     // Schüsse (Bit 3)
-    static let heart     : UInt32 = 0b1000    // Herz Power-Up (Bit 4)
-}
-
 /// Die Hauptspielszene, die das gesamte Gameplay verwaltet
 class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Properties
@@ -27,42 +18,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var lastCrownValue: Double = 0.5      // Letzte Position der Digital Crown
     private let playerXPosition: CGFloat = 0.15   // Horizontale Position des Spielers
     
-    /// Asteroiden-bezogene Eigenschaften
-    private var lastAsteroidSpawn: TimeInterval = 0         // Zeitpunkt des letzten Asteroiden-Spawns
-    private let baseAsteroidInterval: TimeInterval = 2.0    // Basis-Zeitintervall zwischen Asteroiden
-    private let asteroidSpeed: CGFloat = 150.0             // Geschwindigkeit der Asteroiden
-    
-    /// Herz Power-Up Eigenschaften
-    private var lastHeartSpawn: TimeInterval = 0           // Zeitpunkt des letzten Herz-Spawns
-    private let baseHeartInterval: TimeInterval = 15.0     // Basis-Zeitintervall zwischen Herzen
-    private let heartSpeed: CGFloat = 100.0               // Geschwindigkeit der Herzen
-    
-    /// Schuss-bezogene Eigenschaften
-    private let bulletSpeed: CGFloat = 300.0             // Geschwindigkeit der Schüsse
-    
     /// UI-Elemente
     private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
     private var gameOverManager: GameOverManager?
+    private var spawnManager: SpawnManager?
     
-    /// Berechnet das aktuelle Spawn-Intervall basierend auf dem Score
-    private var currentAsteroidInterval: TimeInterval {
-        let score = GameManager.shared.score
-        // Reduziere das Intervall mit steigendem Score
-        // Bei Score 1000 ist das Intervall bei etwa 0.5 Sekunden
-        let interval = baseAsteroidInterval * (1.0 / (1.0 + Double(score) / 1000.0))
-        return max(0.5, interval) // Minimum 0.5 Sekunden
-    }
-    
-    /// Berechnet die Anzahl der gleichzeitig zu spawnenden Asteroiden
-    private var currentAsteroidCount: Int {
-        let score = GameManager.shared.score
-        // Erhöhe die Anzahl mit steigendem Score
-        // Bei Score 0: 1 Asteroid
-        // Bei Score 500: 2 Asteroiden
-        // Bei Score 1500: 3 Asteroiden
-        // usw.
-        return 1 + Int(Double(score) / 500.0)
-    }
+    /// Schuss-bezogene Eigenschaften
+    private let bulletSpeed: CGFloat = 300.0             // Geschwindigkeit der Schüsse
     
     // MARK: - Initialization
     
@@ -92,6 +54,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         setupUI()
         setupPlayer()
         setupCrownControl()
+        
+        // Initialize SpawnManager
+        spawnManager = SpawnManager(scene: self)
         
         // Starte das Spiel automatisch
         GameManager.shared.startGame()
@@ -139,8 +104,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if let ship = playerShip {
             // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(polygonFrom: shipPath)
-            ship.physicsBody?.categoryBitMask = PhysicsCategory.player
-            ship.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid | PhysicsCategory.heart
+            ship.physicsBody?.categoryBitMask = 0b1
+            ship.physicsBody?.contactTestBitMask = 0b10 | 0b1000
             ship.physicsBody?.collisionBitMask = 0  // Keine physische Kollision
             ship.physicsBody?.isDynamic = true
             
@@ -195,32 +160,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         if lastUpdateTime == 0 {
             lastUpdateTime = currentTime
-            lastAsteroidSpawn = currentTime
-            lastHeartSpawn = currentTime
             return
         }
         
         let deltaTime = currentTime - lastUpdateTime
         lastUpdateTime = currentTime
         
-        // Aktualisiere Schiffposition
+        // Update player position
         updatePlayerPosition(deltaTime)
         
-        // Spawn new asteroids
-        if currentTime - lastAsteroidSpawn > currentAsteroidInterval {
-            for _ in 1...currentAsteroidCount {
-                spawnAsteroid()
-            }
-            lastAsteroidSpawn = currentTime
-        }
-        
-        // Spawn new heart power-up
-        if currentTime - lastHeartSpawn > baseHeartInterval {
-            if GameManager.shared.lives < 3 {  // Nur spawnen wenn Leben fehlen
-                spawnHeart()
-            }
-            lastHeartSpawn = currentTime
-        }
+        // Update spawn manager
+        spawnManager?.update(currentTime)
         
         // Update asteroid positions
         updateAsteroids(deltaTime)
@@ -251,37 +201,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     // MARK: - Asteroiden Verwaltung
     
-    /// Erstellt einen neuen Asteroiden
-    private func spawnAsteroid() {
-        let asteroid = Asteroid(size: CGSize(width: 20, height: 20))
-        
-        // Zufällige Y-Position
-        let randomY = CGFloat.random(in: 0...frame.height)
-        asteroid.position = CGPoint(x: frame.width * 1.5, y: randomY)  // Spawne weiter rechts außerhalb des Bildschirms
-        
-        // Zufällige Rotation
-        asteroid.zRotation = CGFloat.random(in: 0...(2 * .pi))
-        
-        // Name für spätere Identifizierung
-        asteroid.name = "asteroid"
-        
-        addChild(asteroid)
-    }
-    
     /// Aktualisiert die Positionen der Asteroiden
     private func updateAsteroids(_ deltaTime: TimeInterval) {
         // Keine Bewegung während Game Over
         guard GameManager.shared.isGameRunning else { return }
         
         enumerateChildNodes(withName: "asteroid") { node, _ in
-            // Bewege Asteroid nach links
-            node.position.x -= self.asteroidSpeed * CGFloat(deltaTime)
+            // Bewege den Asteroiden nach links
+            node.position.x -= 150.0 * CGFloat(deltaTime)  // Feste Geschwindigkeit
             
-            // Rotiere Asteroid
-            node.zRotation += CGFloat(deltaTime)
-            
-            // Entferne Asteroid wenn außerhalb des Bildschirms
-            if node.position.x < -node.frame.width {
+            // Entferne Asteroiden, die den Bildschirm verlassen haben
+            if node.position.x < -50 {
                 node.removeFromParent()
             }
         }
@@ -289,58 +219,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     // MARK: - Herz Power-Up Verwaltung
     
-    /// Erstellt ein neues Herz Power-Up
-    private func spawnHeart() {
-        // Erstelle ein Herz-Symbol
-        let heart = SKShapeNode(path: createHeartPath(size: 12))
-        heart.fillColor = .red
-        heart.strokeColor = .clear
-        heart.name = "heart"
-        
-        // Setze Position am rechten Bildschirmrand mit zufälliger Höhe
-        let randomY = CGFloat.random(in: 0...frame.height)
-        heart.position = CGPoint(x: frame.width + 10, y: randomY)
-        
-        // Füge Physik hinzu
-        heart.physicsBody = SKPhysicsBody(polygonFrom: heart.path!)
-        heart.physicsBody?.categoryBitMask = PhysicsCategory.heart
-        heart.physicsBody?.contactTestBitMask = PhysicsCategory.player
-        heart.physicsBody?.collisionBitMask = 0
-        heart.physicsBody?.affectedByGravity = false
-        
-        addChild(heart)
-    }
-    
-    /// Erstellt einen Herz-Pfad
-    private func createHeartPath(size: CGFloat) -> CGPath {
-        let path = CGMutablePath()
-        
-        // Herz-Form
-        path.move(to: CGPoint(x: size/2, y: size*0.25))
-        path.addCurve(to: CGPoint(x: size, y: 0),
-                     control1: CGPoint(x: size/2, y: 0),
-                     control2: CGPoint(x: size*0.75, y: 0))
-        path.addCurve(to: CGPoint(x: size/2, y: size),
-                     control1: CGPoint(x: size, y: size*0.5),
-                     control2: CGPoint(x: size/2, y: size*0.75))
-        path.addCurve(to: CGPoint(x: 0, y: 0),
-                     control1: CGPoint(x: size/2, y: size*0.75),
-                     control2: CGPoint(x: 0, y: size*0.5))
-        path.addCurve(to: CGPoint(x: size/2, y: size*0.25),
-                     control1: CGPoint(x: size*0.25, y: 0),
-                     control2: CGPoint(x: size/2, y: 0))
-        
-        return path
-    }
-    
     /// Aktualisiert die Positionen der Herzen
     private func updateHearts(_ deltaTime: TimeInterval) {
         enumerateChildNodes(withName: "heart") { node, _ in
-            // Bewege nach links
-            node.position.x -= self.heartSpeed * CGFloat(deltaTime)
+            // Bewege das Herz nach links
+            node.position.x -= 100.0 * CGFloat(deltaTime)  // Feste Geschwindigkeit
             
-            // Entferne wenn außerhalb des Bildschirms
-            if node.position.x < -10 {
+            // Entferne Herzen, die den Bildschirm verlassen haben
+            if node.position.x < -50 {
                 node.removeFromParent()
             }
         }
@@ -360,16 +246,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         let collision = contact.bodyA.categoryBitMask | contact.bodyB.categoryBitMask
         
         switch collision {
-        case PhysicsCategory.player | PhysicsCategory.asteroid:
+        case 0b1 | 0b10:
             // Kollision zwischen Spieler und Asteroid
             handlePlayerAsteroidCollision(contact)
             print("Kollision erkannt!")
             
-        case PhysicsCategory.bullet | PhysicsCategory.asteroid:
+        case 0b100 | 0b10:
             // Kollision zwischen Schuss und Asteroid
             handleBulletAsteroidCollision(contact)
             
-        case PhysicsCategory.player | PhysicsCategory.heart:
+        case 0b1 | 0b1000:
             // Kollision zwischen Spieler und Herz
             handlePlayerHeartCollision(contact)
             
@@ -381,7 +267,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Verarbeitet die Kollision zwischen Spieler und Asteroid
     private func handlePlayerAsteroidCollision(_ contact: SKPhysicsContact) {
         // Identifiziere den Asteroiden
-        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
+        let asteroid = contact.bodyA.categoryBitMask == 0b10 ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne den Asteroiden
         asteroid?.removeFromParent()
@@ -408,8 +294,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Verarbeitet die Kollision zwischen Schuss und Asteroid
     private func handleBulletAsteroidCollision(_ contact: SKPhysicsContact) {
         // Identifiziere Schuss und Asteroid
-        let bullet = contact.bodyA.categoryBitMask == PhysicsCategory.bullet ? contact.bodyA.node : contact.bodyB.node
-        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
+        let bullet = contact.bodyA.categoryBitMask == 0b100 ? contact.bodyA.node : contact.bodyB.node
+        let asteroid = contact.bodyA.categoryBitMask == 0b10 ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne beide Objekte
         bullet?.removeFromParent()
@@ -432,7 +318,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Verarbeitet die Kollision zwischen Spieler und Herz
     private func handlePlayerHeartCollision(_ contact: SKPhysicsContact) {
         // Identifiziere das Herz
-        let heart = contact.bodyA.categoryBitMask == PhysicsCategory.heart ? contact.bodyA.node : contact.bodyB.node
+        let heart = contact.bodyA.categoryBitMask == 0b1000 ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne das Herz
         heart?.removeFromParent()
@@ -566,8 +452,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Füge Physik-Body hinzu
         bullet.physicsBody = SKPhysicsBody(circleOfRadius: 3)
-        bullet.physicsBody?.categoryBitMask = PhysicsCategory.bullet
-        bullet.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid
+        bullet.physicsBody?.categoryBitMask = 0b100
+        bullet.physicsBody?.contactTestBitMask = 0b10
         bullet.physicsBody?.collisionBitMask = 0
         bullet.physicsBody?.affectedByGravity = false
         
