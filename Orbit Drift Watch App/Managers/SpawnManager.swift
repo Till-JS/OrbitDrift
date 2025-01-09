@@ -1,14 +1,5 @@
 import SpriteKit
 
-/// Definiert die verschiedenen Physik-Kategorien für Kollisionserkennung
-//struct PhysicsCategory {
-//    static let none      : UInt32 = 0         // Keine Kategorie
-//    static let player    : UInt32 = 0b1       // Spielerschiff (Bit 1)
-//    static let asteroid  : UInt32 = 0b10      // Asteroiden (Bit 2)
-//    static let bullet    : UInt32 = 0b100     // Schüsse (Bit 3)
-//    static let heart     : UInt32 = 0b1000    // Herz Power-Up (Bit 4)
-//}
-
 class SpawnManager {
     // MARK: - Properties
     private weak var scene: SKScene?
@@ -23,6 +14,12 @@ class SpawnManager {
     private let baseHeartInterval: TimeInterval = 15.0
     private let heartSpeed: CGFloat = 100.0
     private let heartSize: CGFloat = 15.0  // Größeres Herz
+    
+    // Shield Properties
+    private var lastShieldSpawn: TimeInterval = 0
+    private let baseShieldInterval: TimeInterval = 20.0
+    private let shieldSpeed: CGFloat = 100.0
+    private let shieldSize: CGFloat = 15.0
     
     // MARK: - Initialization
     init(scene: SKScene) {
@@ -62,6 +59,12 @@ class SpawnManager {
             }
             lastHeartSpawn = currentTime
         }
+        
+        // Spawn new shield power-up
+        if currentTime - lastShieldSpawn > baseShieldInterval {
+            spawnShield()
+            lastShieldSpawn = currentTime
+        }
     }
     
     // MARK: - Spawn Methods
@@ -96,13 +99,41 @@ class SpawnManager {
         
         // Füge Physik hinzu
         heart.physicsBody = SKPhysicsBody(polygonFrom: heart.path!)
-        heart.physicsBody?.categoryBitMask = 0b1000
-        heart.physicsBody?.contactTestBitMask = 0b1
+        heart.physicsBody?.categoryBitMask = PhysicsCategory.heart
+        heart.physicsBody?.contactTestBitMask = PhysicsCategory.player
         heart.physicsBody?.collisionBitMask = 0
         heart.physicsBody?.affectedByGravity = false
         heart.physicsBody?.isDynamic = true
         
         scene.addChild(heart)
+    }
+    
+    private func spawnShield() {
+        guard let scene = scene else { return }
+        
+        // Erstelle ein Schild-Symbol
+        let shield = SKShapeNode(circleOfRadius: shieldSize)
+        shield.fillColor = .cyan
+        shield.strokeColor = .clear
+        shield.name = "shield"
+        shield.zPosition = 1
+        
+        // Setze Position am rechten Bildschirmrand mit zufälliger Höhe
+        let randomY = CGFloat.random(in: shieldSize...scene.frame.height-shieldSize)
+        shield.position = CGPoint(x: scene.frame.width + shieldSize, y: randomY)
+        
+        // Füge Physik hinzu
+        shield.physicsBody = SKPhysicsBody(circleOfRadius: shieldSize)
+        shield.physicsBody?.categoryBitMask = PhysicsCategory.shield  // Shield category
+        shield.physicsBody?.contactTestBitMask = PhysicsCategory.player   // Kontakt mit Spieler
+        shield.physicsBody?.collisionBitMask = 0
+        
+        // Bewegung nach links
+        let moveLeft = SKAction.moveBy(x: -(scene.frame.width + 2 * shieldSize), y: 0, duration: TimeInterval(scene.frame.width / shieldSpeed))
+        let remove = SKAction.removeFromParent()
+        shield.run(SKAction.sequence([moveLeft, remove]))
+        
+        scene.addChild(shield)
     }
     
     /// Erstellt einen Herz-Pfad
@@ -134,5 +165,6 @@ class SpawnManager {
     func reset() {
         lastAsteroidSpawn = 0
         lastHeartSpawn = 0
+        lastShieldSpawn = 0
     }
 }

@@ -17,6 +17,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var currentPlayerY: CGFloat = 0       // Aktuelle vertikale Position des Schiffs
     private var lastCrownValue: Double = 0.5      // Letzte Position der Digital Crown
     private let playerXPosition: CGFloat = 0.15   // Horizontale Position des Spielers
+    private var shieldActive: Bool = false        // Status des Schutzschilds
+    private var shieldNode: SKShapeNode?          // Visueller Schutzschild
     
     /// UI-Elemente
     private var scoreLabel: SKLabelNode?   // Label zur Anzeige des Punktestands
@@ -104,8 +106,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if let ship = playerShip {
             // Konfiguriere Physik-Körper für Kollisionserkennung
             ship.physicsBody = SKPhysicsBody(polygonFrom: shipPath)
-            ship.physicsBody?.categoryBitMask = 0b1
-            ship.physicsBody?.contactTestBitMask = 0b10 | 0b1000
+            ship.physicsBody?.categoryBitMask = PhysicsCategory.player
+            ship.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid | PhysicsCategory.heart
             ship.physicsBody?.collisionBitMask = 0  // Keine physische Kollision
             ship.physicsBody?.isDynamic = true
             
@@ -245,29 +247,35 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     func didBegin(_ contact: SKPhysicsContact) {
         let collision = contact.bodyA.categoryBitMask | contact.bodyB.categoryBitMask
         
-        switch collision {
-        case 0b1 | 0b10:
-            // Kollision zwischen Spieler und Asteroid
-            handlePlayerAsteroidCollision(contact)
-            print("Kollision erkannt!")
-            
-        case 0b100 | 0b10:
-            // Kollision zwischen Schuss und Asteroid
-            handleBulletAsteroidCollision(contact)
-            
-        case 0b1 | 0b1000:
-            // Kollision zwischen Spieler und Herz
+        // Kollision zwischen Spieler und Asteroid
+        if collision == (PhysicsCategory.player | PhysicsCategory.asteroid) {
+            if shieldActive {
+                handleShieldCollision(contact)
+            } else {
+                handlePlayerAsteroidCollision(contact)
+            }
+        }
+        
+        // Kollision zwischen Spieler und Herz
+        else if collision == (PhysicsCategory.player | PhysicsCategory.heart) {
             handlePlayerHeartCollision(contact)
-            
-        default:
-            break
+        }
+        
+        // Kollision zwischen Spieler und Schutzschild
+        else if collision == (PhysicsCategory.player | PhysicsCategory.shield) {
+            handleShieldPickup(contact)
+        }
+        
+        // Kollision zwischen Schuss und Asteroid
+        else if collision == (PhysicsCategory.bullet | PhysicsCategory.asteroid) {
+            handleBulletAsteroidCollision(contact)
         }
     }
     
     /// Verarbeitet die Kollision zwischen Spieler und Asteroid
     private func handlePlayerAsteroidCollision(_ contact: SKPhysicsContact) {
         // Identifiziere den Asteroiden
-        let asteroid = contact.bodyA.categoryBitMask == 0b10 ? contact.bodyA.node : contact.bodyB.node
+        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne den Asteroiden
         asteroid?.removeFromParent()
@@ -294,8 +302,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Verarbeitet die Kollision zwischen Schuss und Asteroid
     private func handleBulletAsteroidCollision(_ contact: SKPhysicsContact) {
         // Identifiziere Schuss und Asteroid
-        let bullet = contact.bodyA.categoryBitMask == 0b100 ? contact.bodyA.node : contact.bodyB.node
-        let asteroid = contact.bodyA.categoryBitMask == 0b10 ? contact.bodyA.node : contact.bodyB.node
+        let bullet = contact.bodyA.categoryBitMask == PhysicsCategory.bullet ? contact.bodyA.node : contact.bodyB.node
+        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne beide Objekte
         bullet?.removeFromParent()
@@ -318,7 +326,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Verarbeitet die Kollision zwischen Spieler und Herz
     private func handlePlayerHeartCollision(_ contact: SKPhysicsContact) {
         // Identifiziere das Herz
-        let heart = contact.bodyA.categoryBitMask == 0b1000 ? contact.bodyA.node : contact.bodyB.node
+        let heart = contact.bodyA.categoryBitMask == PhysicsCategory.heart ? contact.bodyA.node : contact.bodyB.node
         
         // Entferne das Herz
         heart?.removeFromParent()
@@ -341,6 +349,67 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Aktualisiere Schifffarbe
         updateShipColor()
+    }
+    
+    private func handleShieldPickup(_ contact: SKPhysicsContact) {
+        // Entferne das Shield-PowerUp
+        let shield = contact.bodyA.categoryBitMask == PhysicsCategory.shield ? contact.bodyA.node : contact.bodyB.node
+        shield?.removeFromParent()
+        
+        // Aktiviere den Schutzschild
+        activateShield()
+    }
+    
+    private func handleShieldCollision(_ contact: SKPhysicsContact) {
+        // Entferne den Asteroiden
+        let asteroid = contact.bodyA.categoryBitMask == PhysicsCategory.asteroid ? contact.bodyA.node : contact.bodyB.node
+        asteroid?.removeFromParent()
+        
+        // Zerstöre den Schutzschild mit Animation
+        if let shield = shieldNode {
+            // Aufblitzen und dann verschwinden
+            let flash = SKAction.sequence([
+                SKAction.fadeAlpha(to: 1.0, duration: 0.1),
+                SKAction.fadeAlpha(to: 0.7, duration: 0.1),
+                SKAction.wait(forDuration: 0.1),
+                SKAction.group([
+                    SKAction.scale(to: 1.5, duration: 0.2),
+                    SKAction.fadeOut(withDuration: 0.2)
+                ]),
+                SKAction.removeFromParent()
+            ])
+            shield.run(flash)
+            shieldNode = nil
+            shieldActive = false
+        }
+    }
+    
+    private func activateShield() {
+        guard let player = playerShip else { return }
+        
+        // Erstelle den visuellen Schutzschild
+        let shield = SKShapeNode(circleOfRadius: 20)
+        shield.strokeColor = .cyan
+        shield.lineWidth = 2
+        shield.fillColor = .clear
+        shield.alpha = 0.7
+        shield.zPosition = 1
+        
+        // Füge einen subtilen Pulsiereffekt hinzu
+        let scaleUp = SKAction.scale(to: 1.05, duration: 1.0)
+        let scaleDown = SKAction.scale(to: 0.95, duration: 1.0)
+        let pulse = SKAction.sequence([scaleUp, scaleDown])
+        shield.run(SKAction.repeatForever(pulse))
+        
+        player.addChild(shield)
+        shieldNode = shield
+        shieldActive = true
+    }
+    
+    private func deactivateShield() {
+        shieldNode?.removeFromParent()
+        shieldNode = nil
+        shieldActive = false
     }
     
     /// Aktualisiert die Farbe des Schiffs basierend auf den verbleibenden Leben
@@ -452,8 +521,8 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         // Füge Physik-Body hinzu
         bullet.physicsBody = SKPhysicsBody(circleOfRadius: 3)
-        bullet.physicsBody?.categoryBitMask = 0b100
-        bullet.physicsBody?.contactTestBitMask = 0b10
+        bullet.physicsBody?.categoryBitMask = PhysicsCategory.bullet
+        bullet.physicsBody?.contactTestBitMask = PhysicsCategory.asteroid
         bullet.physicsBody?.collisionBitMask = 0
         bullet.physicsBody?.affectedByGravity = false
         
@@ -482,8 +551,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         return gameOverManager?.isRestartAllowed ?? true
     }
     
-    /// Startet das Spiel neu
-    func restartGame() {
+    public func restartGame() {
         gameOverManager?.restartGame()
     }
 }
