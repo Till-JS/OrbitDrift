@@ -15,6 +15,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private var playerShip: SKShapeNode?          // Das Raumschiff-Sprite
     private var lastUpdateTime: TimeInterval = 0   // Zeitpunkt des letzten Updates
     private var currentPlayerY: CGFloat = 0       // Aktuelle vertikale Position des Schiffs
+    private var targetPlayerY: CGFloat = 0        // Zielposition des Schiffs
     private var lastCrownValue: Double = 0.5      // Letzte Position der Digital Crown
     private let playerXPosition: CGFloat = 0.15   // Horizontale Position des Spielers
     private var shieldActive: Bool = false        // Status des Schutzschilds
@@ -128,8 +129,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             object: nil
         )
         
-        // Setze initiale Position
+        // Setze initiale Position in der Mitte des Bildschirms
         currentPlayerY = frame.height * 0.5
+        targetPlayerY = currentPlayerY
         lastCrownValue = 0.5
         
         if let ship = playerShip {
@@ -151,6 +153,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Normalisiere die Crown-Position auf die erlaubten Grenzen
         let normalizedValue = max(minY/frame.height, min((maxY/frame.height), value))
         lastCrownValue = normalizedValue
+        
+        // Setze das Ziel, aber bewege das Schiff nicht direkt
+        targetPlayerY = frame.height * CGFloat(normalizedValue)
     }
     
     // MARK: - Update Loop
@@ -191,8 +196,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private func updatePlayerPosition(_ deltaTime: TimeInterval) {
         guard let ship = playerShip else { return }
         
-        // Direkte Positionierung basierend auf Crown-Position
-        currentPlayerY = frame.height * CGFloat(lastCrownValue)
+        // Interpoliere sanft zwischen aktueller und Zielposition
+        let interpolationSpeed: CGFloat = 8.0 // Höherer Wert = schnellere Bewegung
+        let difference = targetPlayerY - currentPlayerY
+        currentPlayerY += difference * min(1.0, CGFloat(deltaTime) * interpolationSpeed)
         
         // Stelle sicher, dass wir innerhalb der Bildschirmgrenzen bleiben
         currentPlayerY = max(ship.frame.height/2, min(frame.height - ship.frame.height/2, currentPlayerY))
@@ -424,12 +431,16 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     private func updateShipColor() {
         guard let ship = playerShip else { return }
         
-        // Setze die Grundfarbe auf Cyan
-        ship.fillColor = .cyan
-        
-        // Wenn weniger als 2 Leben übrig sind, färbe orange
-        if GameManager.shared.lives < 2 {
-            ship.fillColor = .orange
+        // Wähle die Farbe basierend auf den verbleibenden Leben
+        switch GameManager.shared.lives {
+        case 3:     // Volles Leben
+            ship.fillColor = .cyan
+        case 2:     // Mittleres Leben
+            ship.fillColor = SKColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 1.0) // Helles Orange
+        case 1:     // Kritisches Leben
+            ship.fillColor = .red
+        default:    // Keine Leben mehr oder unerwarteter Zustand
+            ship.fillColor = .red
         }
     }
     
